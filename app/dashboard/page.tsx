@@ -1,66 +1,40 @@
 'use client';
 
-
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
-  const router = useRouter();
-  
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+  const { user } = useAuth();
+  const [greeting, setGreeting] = useState('');
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good morning');
+    else if (hour < 18) setGreeting('Good afternoon');
+    else setGreeting('Good evening');
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      {/* Header */}
-      <header className="bg-slate-800 shadow-sm sticky top-0 z-10 border-b border-slate-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">WellFed Chef Portal</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-300 bg-slate-700 py-1 px-3 rounded-full">
-              {user?.email}
-            </span>
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg border border-slate-600 shadow-button transition-all hover:shadow-md flex items-center gap-1"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    <>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-white mb-2">{greeting}, Chef!</h2>
+        <p className="text-gray-300">Welcome to your WellFed Chef Portal. Manage your recipes and profile from here.</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-slate-900 shadow-soft rounded-xl p-6 border border-primary hover:shadow-lg transition-all duration-300 hover:border-primary">
+          <div className="flex items-center justify-between mb-4">
+            <div className="bg-primary/20 p-3 rounded-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-10">
-          <h2 className="text-2xl font-bold text-white mb-2">Welcome, Chef</h2>
-          <p className="text-gray-300">Manage your recipes and culinary creations</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-slate-800 shadow-soft rounded-xl p-6 border border-slate-700 hover:shadow-lg transition-all duration-300 hover:border-primary">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-primary/20 p-3 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
               </div>
               <span className="text-xs font-medium text-primary-300 bg-primary/10 py-1 px-2 rounded-full">New</span>
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">Create Recipe</h3>
             <p className="text-gray-300 mb-6">Add a new recipe with ingredients, instructions, and nutritional information</p>
-            <Link href="/recipes/new" className="inline-flex items-center text-primary-300 font-medium hover:text-primary-200 transition-colors">
+            <Link href="/dashboard/recipes/new" className="inline-flex items-center text-primary hover:text-primary-400 font-medium transition-colors">
               Get Started
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -68,7 +42,7 @@ export default function Dashboard() {
             </Link>
           </div>
           
-          <div className="bg-slate-800 shadow-soft rounded-xl p-6 border border-slate-700 hover:shadow-lg transition-all duration-300 hover:border-primary">
+          <div className="bg-slate-900 shadow-soft rounded-xl p-6 border border-primary hover:shadow-lg transition-all duration-300 hover:border-primary">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-primary/20 p-3 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,7 +61,7 @@ export default function Dashboard() {
             </Link>
           </div>
           
-          <div className="bg-slate-800 shadow-soft rounded-xl p-6 border border-slate-700 hover:shadow-lg transition-all duration-300 hover:border-primary">
+          <div className="bg-slate-900 shadow-soft rounded-xl p-6 border border-primary hover:shadow-lg transition-all duration-300 hover:border-primary">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-primary/20 p-3 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +80,6 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
-      </main>
-    </div>
+      </>
   );
 }
