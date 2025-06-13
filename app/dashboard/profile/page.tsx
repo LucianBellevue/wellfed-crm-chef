@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useAuth } from '../../context/AuthContext';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { db, storage } from '../../firebase/config';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 interface ChefProfile {
   displayName: string;
@@ -12,6 +14,7 @@ interface ChefProfile {
   yearsOfExperience: string;
   location: string;
   contactEmail: string;
+  profileImageUrl?: string;
   socialLinks: {
     website?: string;
     instagram?: string;
@@ -34,8 +37,13 @@ export default function ProfilePage() {
     yearsOfExperience: '',
     location: '',
     contactEmail: '',
+    profileImageUrl: '',
     socialLinks: {}
   });
+  
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -83,6 +91,89 @@ export default function ProfilePage() {
         ...prev,
         [name]: value
       }));
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.match('image.*')) {
+      setError('Please select an image file (JPEG, PNG, etc)');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setError('');
+
+    try {
+      // Delete previous image if exists
+      if (profile.profileImageUrl) {
+        try {
+          const previousImageRef = ref(storage, profile.profileImageUrl);
+          await deleteObject(previousImageRef);
+        } catch (err) {
+          console.error('Error deleting previous image:', err);
+          // Continue with upload even if delete fails
+        }
+      }
+
+      // Create a storage reference
+      const storageRef = ref(storage, `profileImages/${user.uid}/${file.name}`);
+      
+      // Upload file with progress tracking
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = Math.round(
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+          );
+          setUploadProgress(progress);
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          setError('Failed to upload image');
+          setIsUploading(false);
+        },
+        async () => {
+          // Upload completed successfully
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          
+          // Update profile with new image URL
+          setProfile(prev => ({
+            ...prev,
+            profileImageUrl: downloadURL
+          }));
+          
+          setIsUploading(false);
+        }
+      );
+    } catch (err) {
+      console.error('Error handling image upload:', err);
+      setError('Failed to process image upload');
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!user || !profile.profileImageUrl) return;
+    
+    try {
+      // Delete image from storage
+      const imageRef = ref(storage, profile.profileImageUrl);
+      await deleteObject(imageRef);
+      
+      // Update profile
+      setProfile(prev => ({
+        ...prev,
+        profileImageUrl: ''
+      }));
+    } catch (err) {
+      console.error('Error removing image:', err);
+      setError('Failed to remove profile image');
     }
   };
 
@@ -150,6 +241,71 @@ export default function ProfilePage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-slate-900 border border-primary rounded-xl p-6 shadow-md">
+          <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-700">Profile Image</h2>
+          
+          <div className="flex flex-col items-center md:flex-row md:items-start gap-6 mb-6">
+            <div className="relative w-32 h-32 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center border-2 border-slate-600">
+              {profile.profileImageUrl ? (
+                <Image 
+                  src={profile.profileImageUrl} 
+                  alt="Chef profile" 
+                  fill 
+                  className="object-cover"
+                  sizes="128px"
+                />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
+              
+              {isUploading && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                  <div className="text-white text-sm font-medium">{uploadProgress}%</div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+              />
+              
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isUploading ? (
+                  <>
+                    <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
+                    Uploading...
+                  </>
+                ) : 'Upload Image'}
+              </button>
+              
+              {profile.profileImageUrl && (
+                <button 
+                  type="button" 
+                  onClick={handleRemoveImage}
+                  disabled={isUploading}
+                  className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  Remove Image
+                </button>
+              )}
+              
+              <p className="text-xs text-gray-400 mt-1">
+                Recommended: Square image, at least 500x500 pixels
+              </p>
+            </div>
+          </div>
+          
           <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-700">Basic Information</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

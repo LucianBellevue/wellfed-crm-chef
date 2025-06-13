@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   ref, 
   uploadBytesResumable, 
   getDownloadURL, 
-  listAll, 
   deleteObject 
 } from 'firebase/storage';
 import { 
@@ -41,13 +40,7 @@ export default function MediaPage() {
   const [description, setDescription] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchMediaFiles();
-    }
-  }, [user]);
-
-  const fetchMediaFiles = async () => {
+  const fetchMediaFiles = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -82,7 +75,13 @@ export default function MediaPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+  
+  useEffect(() => {
+    if (user) {
+      fetchMediaFiles();
+    }
+  }, [user, fetchMediaFiles]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user || !e.target.files || e.target.files.length === 0) return;
@@ -254,11 +253,11 @@ export default function MediaPage() {
       )}
 
       <div className="bg-slate-900 border border-primary rounded-xl p-6 shadow-md mb-8">
-        <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-700">Upload New Media</h2>
+        <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-gray-800">Upload New Media</h2>
         
         <div className="space-y-4">
           <div>
-            <label htmlFor="file" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="file" className="block text-sm font-medium text-white mb-1">
               Select File
             </label>
             <input
@@ -267,7 +266,7 @@ export default function MediaPage() {
               ref={fileInputRef}
               onChange={handleFileUpload}
               disabled={uploading}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-600"
+              className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-600"
             />
           </div>
           
@@ -281,14 +280,14 @@ export default function MediaPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={uploading}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="Describe this media file..."
             />
           </div>
           
           {uploading && (
             <div className="mt-4">
-              <div className="w-full bg-slate-700 rounded-full h-2.5">
+              <div className="w-full bg-slate-900 rounded-full h-2.5">
                 <div 
                   className="bg-primary h-2.5 rounded-full" 
                   style={{ width: `${uploadProgress}%` }}
@@ -301,7 +300,7 @@ export default function MediaPage() {
       </div>
 
       <div className="bg-slate-900 border border-primary rounded-xl p-6 shadow-md">
-        <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-700">Your Media Files</h2>
+        <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-gray-800">Your Media Files</h2>
         
         {files.length === 0 ? (
           <div className="text-center py-8">

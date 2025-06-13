@@ -37,12 +37,12 @@ export default function DashboardLayout({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+            <h1 className="text-2xl font-bold text-primary">
               WellFed Chef Portal
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-300 bg-slate-900 py-1 px-3 rounded-full border border-slate-700">
+            <span className="text-sm text-gray-300 bg-slate-900 py-1 px-3 rounded-full border border-primary">
               {user?.email}
             </span>
             <button
@@ -99,7 +99,7 @@ export default function DashboardLayout({
           <div className="md:hidden fixed inset-0 z-20 bg-slate-900/95">
             <div className="pt-5 pb-6 px-5">
               <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">
+                <h1 className="text-2xl font-bold text-primary">
                   Menu
                 </h1>
                 <button

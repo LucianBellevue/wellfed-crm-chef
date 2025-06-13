@@ -154,11 +154,11 @@ export default function NewRecipe() {
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
-      <header className="bg-slate-800 shadow border-b border-slate-700">
+      <header className="bg-slate-900 shadow border-b border-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">Create New Recipe</h1>
           <div className="flex items-center space-x-4">
-            <Link href="/recipes" className="text-primary-300 hover:text-primary-200 transition-colors">
+            <Link href="/recipes" className="text-primary hover:text-primary-400 transition-colors">
               Back to Recipes
             </Link>
           </div>
@@ -167,7 +167,7 @@ export default function NewRecipe() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-slate-800 shadow rounded-lg p-6 border border-slate-700">
+        <div className="bg-slate-900 shadow rounded-lg p-6 border border-primary">
           {error && (
             <div className="mb-6 p-4 bg-red-900/30 border border-red-800 text-red-300 rounded-lg flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -180,7 +180,7 @@ export default function NewRecipe() {
           <form onSubmit={handleSubmit}>
             {/* Basic Info */}
             <div className="mb-8">
-              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-slate-700 text-white">Basic Information</h2>
+              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-gray-700 text-white">Basic Information</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -193,7 +193,7 @@ export default function NewRecipe() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                     required
                   />
                 </div>
@@ -208,7 +208,7 @@ export default function NewRecipe() {
                     name="cuisine"
                     value={formData.cuisine}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
               </div>
@@ -223,7 +223,7 @@ export default function NewRecipe() {
                   rows={3}
                   value={formData.description}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                 />
               </div>
 
@@ -238,7 +238,7 @@ export default function NewRecipe() {
                     name="prepTime"
                     value={formData.prepTime}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
 
@@ -252,7 +252,7 @@ export default function NewRecipe() {
                     name="cookTime"
                     value={formData.cookTime}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
 
@@ -266,7 +266,7 @@ export default function NewRecipe() {
                     name="servings"
                     value={formData.servings}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
               </div>
@@ -280,7 +280,7 @@ export default function NewRecipe() {
                   name="difficulty"
                   value={formData.difficulty}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                 >
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
@@ -291,7 +291,7 @@ export default function NewRecipe() {
 
             {/* Ingredients */}
             <div className="mb-8">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
                 <h2 className="text-lg font-medium text-white">Ingredients</h2>
                 <button
                   type="button"
@@ -312,7 +312,7 @@ export default function NewRecipe() {
                         placeholder="Ingredient name"
                         value={ingredient.name}
                         onChange={(e) => handleIngredientChange(index, e)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                        className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                       />
                     </div>
                     <div>
@@ -322,7 +322,7 @@ export default function NewRecipe() {
                         placeholder="Quantity"
                         value={ingredient.quantity}
                         onChange={(e) => handleIngredientChange(index, e)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                        className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                       />
                     </div>
                     <div>
@@ -332,7 +332,7 @@ export default function NewRecipe() {
                         placeholder="Unit (g, ml, tsp, etc.)"
                         value={ingredient.unit}
                         onChange={(e) => handleIngredientChange(index, e)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                        className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                       />
                     </div>
                   </div>
@@ -350,7 +350,7 @@ export default function NewRecipe() {
 
             {/* Steps */}
             <div className="mb-8">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
                 <h2 className="text-lg font-medium text-white">Preparation Steps</h2>
                 <button
                   type="button"
@@ -372,7 +372,7 @@ export default function NewRecipe() {
                       rows={2}
                       value={step.description}
                       onChange={(e) => handleStepChange(index, e)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                      className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                     />
                   </div>
                   <button
@@ -389,14 +389,14 @@ export default function NewRecipe() {
 
             {/* Notes */}
             <div className="mb-8">
-              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-slate-700 text-white">Additional Notes</h2>
+              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-primary text-white">Additional Notes</h2>
               <textarea
                 id="notes"
                 name="notes"
                 rows={4}
                 value={formData.notes}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                 placeholder="Any additional notes, tips, or variations..."
               />
             </div>

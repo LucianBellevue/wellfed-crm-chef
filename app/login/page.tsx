@@ -56,12 +56,12 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-600">WellFed Chef Portal</h1>
-            <p className="text-gray-300">Sign in to manage your recipes</p>
+            <h1 className="text-4xl font-bold mb-2 text-primary">WellFed Chef Portal</h1>
+            <p className="text-white">Sign in to manage your recipes</p>
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-xl shadow-soft p-8 border border-slate-700">
+        <div className="bg-slate-900 rounded-xl shadow-soft p-8 border border-primary">
           {error && (
             <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-300 rounded-lg flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -90,7 +90,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors placeholder-gray-400"
+                className="w-full px-4 py-2.5 bg-slate-700 border border-primary text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors placeholder-gray-400"
                 required
               />
             </div>

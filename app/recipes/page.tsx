@@ -67,11 +67,11 @@ export default function Recipes() {
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
-      <header className="bg-slate-800 shadow border-b border-slate-700">
+      <header className="bg-slate-900 shadow border-b border-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">Recipes</h1>
           <div className="flex items-center space-x-4">
-            <Link href="/dashboard" className="text-primary-300 hover:text-primary-200 transition-colors">
+            <Link href="/dashboard" className="text-primary hover:text-primary-400 transition-colors">
               Dashboard
             </Link>
             <Link 
@@ -86,7 +86,7 @@ export default function Recipes() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-slate-800 shadow rounded-lg p-6 border border-slate-700">
+        <div className="bg-slate-900 shadow rounded-lg p-6 border border-primary">
           <h2 className="text-xl font-semibold mb-6 text-white">All Recipes</h2>
           
           {loading ? (
@@ -105,13 +105,13 @@ export default function Recipes() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-700">
-                <thead className="bg-slate-700">
+              <table className="min-w-full divide-y divide-slate-900">
+                <thead className="bg-slate-900">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                       Name
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                       Description
                     </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -119,7 +119,7 @@ export default function Recipes() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-slate-800 divide-y divide-slate-700">
+                <tbody className="bg-slate-900 divide-y divide-slate-900">
                   {recipes.map((recipe) => (
                     <tr key={recipe.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
