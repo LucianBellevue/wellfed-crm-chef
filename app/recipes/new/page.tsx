@@ -19,11 +19,25 @@ export default function NewRecipe() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    prepTime: '',
-    cookTime: '',
+    totalTime: '',
     servings: '',
-    difficulty: 'medium',
+    categories: {
+      breakfast: false,
+      lunch: false,
+      dinner: false,
+      beverage: false,
+      desserts: false,
+      appetizer: false,
+      snack: false
+    },
     cuisine: '',
+    tools: '',
+    nutrition: {
+      calories: '',
+      protein: '',
+      fat: '',
+      carbs: ''
+    },
     ingredients: [{ name: '', quantity: '', unit: '' }],
     steps: [{ description: '' }],
     notes: ''
@@ -34,6 +48,16 @@ export default function NewRecipe() {
     setFormData({
       ...formData,
       [name]: value
+    });
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setFormData({
+      ...formData,
+      categories: {
+        ...formData.categories,
+        [category]: !formData.categories[category as keyof typeof formData.categories]
+      }
     });
   };
 
@@ -227,30 +251,16 @@ export default function NewRecipe() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                 <div>
-                  <label htmlFor="prepTime" className="block text-sm font-medium text-gray-300 mb-1">
-                    Prep Time (minutes)
+                  <label htmlFor="totalTime" className="block text-sm font-medium text-gray-300 mb-1">
+                    Total Cook Time (minutes)
                   </label>
                   <input
                     type="number"
-                    id="prepTime"
-                    name="prepTime"
-                    value={formData.prepTime}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="cookTime" className="block text-sm font-medium text-gray-300 mb-1">
-                    Cook Time (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    id="cookTime"
-                    name="cookTime"
-                    value={formData.cookTime}
+                    id="totalTime"
+                    name="totalTime"
+                    value={formData.totalTime}
                     onChange={handleChange}
                     className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
@@ -272,20 +282,203 @@ export default function NewRecipe() {
               </div>
 
               <div className="mt-4">
-                <label htmlFor="difficulty" className="block text-sm font-medium text-gray-300 mb-1">
-                  Difficulty
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Categories
                 </label>
-                <select
-                  id="difficulty"
-                  name="difficulty"
-                  value={formData.difficulty}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="breakfast"
+                      checked={formData.categories.breakfast}
+                      onChange={() => handleCategoryChange('breakfast')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="breakfast" className="ml-2 text-sm text-gray-300">
+                      Breakfast
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="lunch"
+                      checked={formData.categories.lunch}
+                      onChange={() => handleCategoryChange('lunch')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="lunch" className="ml-2 text-sm text-gray-300">
+                      Lunch
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="dinner"
+                      checked={formData.categories.dinner}
+                      onChange={() => handleCategoryChange('dinner')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="dinner" className="ml-2 text-sm text-gray-300">
+                      Dinner
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="beverage"
+                      checked={formData.categories.beverage}
+                      onChange={() => handleCategoryChange('beverage')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="beverage" className="ml-2 text-sm text-gray-300">
+                      Beverage
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="desserts"
+                      checked={formData.categories.desserts}
+                      onChange={() => handleCategoryChange('desserts')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="desserts" className="ml-2 text-sm text-gray-300">
+                      Desserts
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="appetizer"
+                      checked={formData.categories.appetizer}
+                      onChange={() => handleCategoryChange('appetizer')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="appetizer" className="ml-2 text-sm text-gray-300">
+                      Appetizer
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="snack"
+                      checked={formData.categories.snack}
+                      onChange={() => handleCategoryChange('snack')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="snack" className="ml-2 text-sm text-gray-300">
+                      Snack
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tools Required */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
+                <h2 className="text-lg font-medium text-white">Tools Required</h2>
+              </div>
+              <textarea
+                id="tools"
+                name="tools"
+                value={formData.tools}
+                onChange={handleChange}
+                placeholder="List any special tools or equipment needed (e.g., blender, food processor, dutch oven)"
+                className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400 min-h-[80px]"
+              />
+            </div>
+
+            {/* Nutrition Per Serving */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
+                <h2 className="text-lg font-medium text-white">Nutrition Per Serving</h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label htmlFor="calories" className="block text-sm font-medium text-gray-300 mb-1">
+                    Calories
+                  </label>
+                  <input
+                    type="number"
+                    id="calories"
+                    name="nutrition.calories"
+                    value={formData.nutrition.calories}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          calories: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="protein" className="block text-sm font-medium text-gray-300 mb-1">
+                    Protein (g)
+                  </label>
+                  <input
+                    type="number"
+                    id="protein"
+                    name="nutrition.protein"
+                    value={formData.nutrition.protein}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          protein: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="fat" className="block text-sm font-medium text-gray-300 mb-1">
+                    Fat (g)
+                  </label>
+                  <input
+                    type="number"
+                    id="fat"
+                    name="nutrition.fat"
+                    value={formData.nutrition.fat}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          fat: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="carbs" className="block text-sm font-medium text-gray-300 mb-1">
+                    Carbs (g)
+                  </label>
+                  <input
+                    type="number"
+                    id="carbs"
+                    name="nutrition.carbs"
+                    value={formData.nutrition.carbs}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          carbs: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
               </div>
             </div>
 

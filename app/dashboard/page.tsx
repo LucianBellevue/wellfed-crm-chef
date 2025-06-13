@@ -34,7 +34,7 @@ export default function Dashboard() {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">Create Recipe</h3>
             <p className="text-gray-300 mb-6">Add a new recipe with ingredients, instructions, and nutritional information</p>
-            <Link href="/dashboard/recipes/new" className="inline-flex items-center text-primary hover:text-primary-400 font-medium transition-colors">
+            <Link href="/recipes/new" className="inline-flex items-center text-primary hover:text-primary-400 font-medium transition-colors">
               Get Started
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -53,7 +53,7 @@ export default function Dashboard() {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">View Recipes</h3>
             <p className="text-gray-300 mb-6">Browse, search, and manage your existing recipe collection</p>
-            <Link href="/recipes" className="inline-flex items-center text-primary-300 font-medium hover:text-primary-200 transition-colors">
+            <Link href="/recipes" className="inline-flex items-center text-primary font-medium hover:text-primary-200 transition-colors">
               View All
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -72,7 +72,7 @@ export default function Dashboard() {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">Analytics</h3>
             <p className="text-gray-300 mb-6">View insights and statistics about your recipe collection</p>
-            <Link href="/analytics" className="inline-flex items-center text-primary-300 font-medium hover:text-primary-200 transition-colors">
+            <Link href="/analytics" className="inline-flex items-center text-primary font-medium hover:text-primary-200 transition-colors">
               View Stats
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

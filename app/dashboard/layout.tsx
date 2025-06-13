@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,20 @@ export default function DashboardLayout({
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  // Load sidebar state from localStorage on component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebarCollapsed');
+    if (savedState !== null) {
+      setIsSidebarCollapsed(savedState === 'true');
+    }
+  }, []);
+  
+  // Save sidebar state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', isSidebarCollapsed.toString());
+  }, [isSidebarCollapsed]);
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -60,7 +74,24 @@ export default function DashboardLayout({
 
       <div className="flex">
         {/* Sidebar for desktop */}
-        <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-primary min-h-[calc(100vh-73px)]">
+        <aside className={`hidden md:flex flex-col ${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-slate-900 border-r border-primary min-h-[calc(100vh-73px)] transition-all duration-300 ease-in-out relative`}>
+          {/* Collapse toggle button */}
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="absolute -right-3 top-1/2 transform -translate-y-1/2 bg-primary text-white rounded-full p-1 shadow-md hover:bg-primary-600 transition-colors z-10"
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-4 w-4 transition-transform duration-300" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isSidebarCollapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
+            </svg>
+          </button>
+          
           <nav className="mt-5 px-2 space-y-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || 
@@ -70,15 +101,16 @@ export default function DashboardLayout({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  className={`group flex items-center ${isSidebarCollapsed ? 'justify-center' : ''} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                     isActive
                       ? 'bg-primary text-white'
                       : 'text-gray-300 hover:bg-slate-800 hover:text-white'
                   }`}
+                  title={isSidebarCollapsed ? item.name : ''}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`mr-3 h-5 w-5 transition-colors ${
+                    className={`${isSidebarCollapsed ? '' : 'mr-3'} h-5 w-5 transition-colors ${
                       isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'
                     }`}
                     fill="none"
@@ -87,7 +119,7 @@ export default function DashboardLayout({
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
                   </svg>
-                  {item.name}
+                  {!isSidebarCollapsed && item.name}
                 </Link>
               );
             })}

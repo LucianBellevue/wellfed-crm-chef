@@ -241,10 +241,10 @@ export default function ProfilePage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-slate-900 border border-primary rounded-xl p-6 shadow-md">
-          <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-700">Profile Image</h2>
+          <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-900">Profile Image</h2>
           
           <div className="flex flex-col items-center md:flex-row md:items-start gap-6 mb-6">
-            <div className="relative w-32 h-32 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center border-2 border-slate-600">
+            <div className="relative w-32 h-32 rounded-full overflow-hidden bg-slate-900 flex items-center justify-center border-2 border-gray-600">
               {profile.profileImageUrl ? (
                 <Image 
                   src={profile.profileImageUrl} 
@@ -279,7 +279,7 @@ export default function ProfilePage() {
                 type="button" 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+                className="px-4 py-2 bg-primary border border-primary hover:bg-slate-900 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isUploading ? (
                   <>
@@ -306,7 +306,7 @@ export default function ProfilePage() {
             </div>
           </div>
           
-          <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-slate-700">Basic Information</h2>
+          <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-gray-700">Basic Information</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -319,7 +319,7 @@ export default function ProfilePage() {
                 name="displayName"
                 value={profile.displayName}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Your professional name"
               />
             </div>
@@ -334,7 +334,7 @@ export default function ProfilePage() {
                 name="specialty"
                 value={profile.specialty}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="e.g. French Cuisine, Pastry, etc."
               />
             </div>
@@ -349,7 +349,7 @@ export default function ProfilePage() {
                 name="yearsOfExperience"
                 value={profile.yearsOfExperience}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="e.g. 5 years"
               />
             </div>
@@ -364,7 +364,7 @@ export default function ProfilePage() {
                 name="location"
                 value={profile.location}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="e.g. New York, NY"
               />
             </div>
@@ -379,7 +379,7 @@ export default function ProfilePage() {
                 name="contactEmail"
                 value={profile.contactEmail}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Your professional email address"
               />
             </div>
@@ -399,7 +399,7 @@ export default function ProfilePage() {
               value={profile.aboutMe}
               onChange={handleInputChange}
               rows={6}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="Tell clients about your culinary background, experience, and cooking philosophy..."
             />
           </div>
@@ -419,7 +419,7 @@ export default function ProfilePage() {
                 name="social-website"
                 value={profile.socialLinks.website || ''}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="https://yourwebsite.com"
               />
             </div>
@@ -434,7 +434,7 @@ export default function ProfilePage() {
                 name="social-instagram"
                 value={profile.socialLinks.instagram || ''}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="https://instagram.com/username"
               />
             </div>
@@ -449,7 +449,7 @@ export default function ProfilePage() {
                 name="social-twitter"
                 value={profile.socialLinks.twitter || ''}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="https://twitter.com/username"
               />
             </div>
@@ -464,7 +464,7 @@ export default function ProfilePage() {
                 name="social-facebook"
                 value={profile.socialLinks.facebook || ''}
                 onChange={handleInputChange}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="https://facebook.com/username"
               />
             </div>
@@ -475,7 +475,7 @@ export default function ProfilePage() {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
+            className="px-6 py-2.5 bg-primary hover:bg-slate-900 border border-primary text-white font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
           >
             {saving ? (
               <>
