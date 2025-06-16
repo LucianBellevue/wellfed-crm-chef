@@ -1,23 +1,56 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { useMediaStore, useAuthStore } from '../store';
 import { toast } from 'react-hot-toast';
+import { useInView } from 'react-intersection-observer';
+
+// Lazy loaded image component
+const LazyImage = ({ src, alt }: { src: string; alt: string; mediaId?: string }) => {
+  const { ref, inView } = useInView({
+    triggerOnce: true,
+    rootMargin: '200px 0px',
+  });
+  
+  return (
+    <div ref={ref} className="w-full h-full relative">
+      {inView ? (
+        <Image 
+          src={src} 
+          alt={alt} 
+          fill
+          style={{ objectFit: 'cover' }}
+          className="rounded-lg"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          loading="lazy"
+          placeholder="blur"
+          blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFdwI2QOQviwAAAABJRU5ErkJggg=="
+        />
+      ) : (
+        <div className="w-full h-full bg-slate-800 animate-pulse rounded-lg"></div>
+      )}
+    </div>
+  );
+};
 
 export default function MediaGallery() {
   const { user } = useAuthStore();
   const { 
     files: mediaFiles, 
-    loading, 
+    loading,
+    loadingMore,
     error, 
+    hasMore,
     uploadState: { progress: uploadProgress, isUploading: uploadingInProgress },
     success,
     fetchMediaFiles,
+    loadMoreMediaFiles,
     uploadMediaFile: uploadMedia,
     deleteMediaFile: deleteMedia,
     clearError,
-    clearSuccess
+    clearSuccess,
+    resetPagination
   } = useMediaStore();
   
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
@@ -27,15 +60,33 @@ export default function MediaGallery() {
   const [mediaUrlToDelete, setMediaUrlToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Fetch media files when component mounts
+  // Fetch media files when component mounts - with debounce
   useEffect(() => {
-    if (user) {
-      fetchMediaFiles(user.uid).catch(err => {
-        console.error('Error fetching media files:', err);
-        toast.error('Failed to load media files');
-      });
-    }
-  }, [user, fetchMediaFiles]);
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (user && isMounted) {
+        try {
+          // Reset pagination when component mounts
+          resetPagination();
+          await fetchMediaFiles(user.uid);
+        } catch (err) {
+          console.error('Error fetching media files:', err);
+          if (isMounted) {
+            toast.error('Failed to load media files');
+          }
+        }
+      }
+    };
+    
+    // Small delay to allow the UI to render first
+    const timeoutId = setTimeout(loadData, 100);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [user, fetchMediaFiles, resetPagination]);
   
   // Clear success message after 3 seconds
   useEffect(() => {
@@ -117,10 +168,15 @@ export default function MediaGallery() {
     return 'unknown';
   };
   
+  // Memoize filtered media files to prevent unnecessary re-renders
+  const displayedMediaFiles = useMemo(() => {
+    return mediaFiles.slice(0, 20); // Limit initial display to improve performance
+  }, [mediaFiles]);
+  
   if (loading && !isUploading && mediaFiles.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -152,7 +208,7 @@ export default function MediaGallery() {
       <div className="mb-6">
         <h3 className="text-xl font-semibold mb-4">Upload Media</h3>
         <div className="flex flex-col md:flex-row gap-4">
-          <label className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded cursor-pointer flex-grow md:flex-grow-0">
+          <label className="bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-4 rounded cursor-pointer flex-grow md:flex-grow-0">
             Select Files
             <input 
               type="file" 
@@ -174,8 +230,8 @@ export default function MediaGallery() {
                 disabled={isUploading}
                 className={`ml-4 ${
                   isUploading 
-                    ? 'bg-blue-800 cursor-not-allowed' 
-                    : 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-primary cursor-not-allowed' 
+                    : 'bg-primary hover:bg-slate-900 border border-primary'
                 } text-white py-2 px-4 rounded`}
               >
                 {isUploading ? 'Uploading...' : 'Upload'}
@@ -189,7 +245,7 @@ export default function MediaGallery() {
           <div className="mt-4">
             <div className="w-full bg-gray-700 rounded-full h-2.5 mb-1">
               <div 
-                className="bg-blue-600 h-2.5 rounded-full" 
+                className="bg-primary h-2.5 rounded-full" 
                 style={{ width: `${uploadProgress}%` }}
                 role="progressbar"
                 aria-valuenow={uploadProgress}
@@ -211,19 +267,16 @@ export default function MediaGallery() {
             <p className="text-gray-400">You haven&apos;t uploaded any media files yet.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {mediaFiles.map((media) => (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {displayedMediaFiles.map((media) => (
               <div key={media.id} className="relative group">
                 <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden">
                   {media.type === 'image' || getFileType(media.url) === 'image' ? (
-                    <Image 
+                    <LazyImage 
                       src={media.url} 
                       alt={media.name || 'Media'} 
-                      fill
-                      style={{ objectFit: 'cover' }}
-                      className="rounded-lg"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      priority={false}
+                      mediaId={media.id}
                     />
                   ) : (
                     <video 
@@ -252,8 +305,29 @@ export default function MediaGallery() {
                   {media.name || 'Untitled'}
                 </p>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            
+            {/* Load More Button */}
+            {hasMore && mediaFiles.length > 0 && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => user && loadMoreMediaFiles(user.uid)}
+                  disabled={loadingMore}
+                  className={`px-4 py-2 ${loadingMore ? 'bg-slate-700' : 'bg-primary hover:bg-slate-900'} border border-primary text-white rounded-md`}
+                >
+                  {loadingMore ? (
+                    <>
+                      <span className="inline-block animate-spin mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full"></span>
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
       
