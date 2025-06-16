@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { DocumentSnapshot } from 'firebase/firestore';
+import Image from 'next/image';
 import { useAuth } from '../../context/AuthContext';
 import { 
   ref, 
@@ -15,9 +17,12 @@ import {
   where, 
   getDocs, 
   deleteDoc, 
-  doc 
+  doc,
+  orderBy,
+  limit,
+  startAfter
 } from 'firebase/firestore';
-import { db, storage } from '../../firebase/config';
+import { db, storage } from '../../../firebase/config';
 
 interface MediaFile {
   id: string;
@@ -29,6 +34,35 @@ interface MediaFile {
   size: number;
 }
 
+// Lazy-loaded image component for media thumbnails
+const LazyMediaThumbnail = ({ file }: { file: MediaFile }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  // Only render image thumbnails for image files
+  if (!file.type.startsWith('image/')) {
+    return null;
+  }
+  
+  return (
+    <div className="relative h-24 w-full bg-slate-800 rounded overflow-hidden mb-2">
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      )}
+      <Image 
+        src={file.url} 
+        alt={file.name}
+        fill
+        style={{ objectFit: 'cover' }}
+        className="rounded"
+        onLoad={() => setIsLoaded(true)}
+        loading="lazy"
+      />
+    </div>
+  );
+};
+
 export default function MediaPage() {
   const { user } = useAuth();
   const [files, setFiles] = useState<MediaFile[]>([]);
@@ -38,20 +72,38 @@ export default function MediaPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [description, setDescription] = useState('');
+  const [hasMore, setHasMore] = useState(true);
+  const [itemsPerPage] = useState(9); // Show 9 items per page (3x3 grid)
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Store last document for pagination
+  const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
+  // Function to fetch initial media files with pagination
   const fetchMediaFiles = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
+      setError('');
+      
+      // Create query with pagination
       const mediaQuery = query(
         collection(db, 'mediaFiles'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+        limit(itemsPerPage)
       );
       
       const querySnapshot = await getDocs(mediaQuery);
       const mediaFiles: MediaFile[] = [];
+      
+      // Store the last document for pagination
+      if (!querySnapshot.empty) {
+        lastDocRef.current = querySnapshot.docs[querySnapshot.docs.length - 1];
+      } else {
+        setHasMore(false);
+      }
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -66,8 +118,6 @@ export default function MediaPage() {
         });
       });
       
-      // Sort by newest first
-      mediaFiles.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       setFiles(mediaFiles);
     } catch (err) {
       console.error('Error fetching media files:', err);
@@ -75,13 +125,71 @@ export default function MediaPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, itemsPerPage]);
+  
+  // Function to load more media files
+  const loadMoreFiles = useCallback(async () => {
+    if (!user || !lastDocRef.current) return;
+    
+    try {
+      setLoading(true);
+      
+      // Create query with pagination starting after the last document
+      const mediaQuery = query(
+        collection(db, 'mediaFiles'),
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDocRef.current),
+        limit(itemsPerPage)
+      );
+      
+      const querySnapshot = await getDocs(mediaQuery);
+      
+      // If no more documents, set hasMore to false
+      if (querySnapshot.empty) {
+        setHasMore(false);
+        setLoading(false);
+        return;
+      }
+      
+      // Store the last document for pagination
+      lastDocRef.current = querySnapshot.docs[querySnapshot.docs.length - 1];
+      
+      const newMediaFiles: MediaFile[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        newMediaFiles.push({
+          id: doc.id,
+          name: data.name,
+          type: data.type,
+          url: data.url,
+          description: data.description,
+          createdAt: data.createdAt.toDate(),
+          size: data.size
+        });
+      });
+      
+      // Update files state with new files
+      setFiles(prevFiles => [...prevFiles, ...newMediaFiles]);
+    } catch (err) {
+      console.error('Error loading more media files:', err);
+      setError('Failed to load more media files');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, itemsPerPage]);
   
   useEffect(() => {
     if (user) {
       fetchMediaFiles();
     }
   }, [user, fetchMediaFiles]);
+  
+  // Reset pagination when user changes
+  useEffect(() => {
+    setHasMore(true);
+    lastDocRef.current = null;
+  }, [user]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user || !e.target.files || e.target.files.length === 0) return;
@@ -181,7 +289,8 @@ export default function MediaPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFileTypeIcon = (type: string) => {
+  // Define the getFileTypeIcon function before the LazyMediaThumbnail component
+const getFileTypeIcon = (type: string) => {
     if (type.startsWith('image/')) {
       return (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -215,7 +324,8 @@ export default function MediaPage() {
     }
   };
 
-  if (loading) {
+  // Only show loading spinner on initial load
+  if (loading && files.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -310,51 +420,76 @@ export default function MediaPage() {
             <p className="text-gray-400">No media files yet. Upload your first file above.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {files.map((file) => (
-              <div key={file.id} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 hover:border-primary transition-all">
-                <div className="p-4">
-                  <div className="flex items-center mb-3">
-                    {getFileTypeIcon(file.type)}
-                    <div className="ml-3">
-                      <h3 className="text-white font-medium truncate" title={file.name}>
-                        {file.name}
-                      </h3>
-                      <p className="text-gray-400 text-sm">{formatFileSize(file.size)}</p>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {files.map((file) => (
+                <div key={file.id} className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 hover:border-primary transition-all">
+                  {file.type.startsWith('image/') && (
+                    <LazyMediaThumbnail file={file} />
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-center mb-3">
+                      {getFileTypeIcon(file.type)}
+                      <div className="ml-3">
+                        <h3 className="text-white font-medium truncate" title={file.name}>
+                          {file.name}
+                        </h3>
+                        <p className="text-gray-400 text-sm">{formatFileSize(file.size)}</p>
+                      </div>
+                    </div>
+                    
+                    {file.description && (
+                      <p className="text-gray-300 text-sm mb-3">{file.description}</p>
+                    )}
+                    
+                    <div className="flex justify-between items-center mt-4">
+                      <a 
+                        href={file.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:text-primary-400 text-sm font-medium flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        View
+                      </a>
+                      
+                      <button
+                        onClick={() => handleDeleteFile(file.id, file.url)}
+                        className="text-red-400 hover:text-red-300 text-sm font-medium flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
                     </div>
                   </div>
-                  
-                  {file.description && (
-                    <p className="text-gray-300 text-sm mb-3">{file.description}</p>
-                  )}
-                  
-                  <div className="flex justify-between items-center mt-4">
-                    <a 
-                      href={file.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:text-primary-400 text-sm font-medium flex items-center"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      View
-                    </a>
-                    
-                    <button
-                      onClick={() => handleDeleteFile(file.id, file.url)}
-                      className="text-red-400 hover:text-red-300 text-sm font-medium flex items-center"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete
-                    </button>
-                  </div>
                 </div>
+              ))}
+            </div>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={loadMoreFiles}
+                  disabled={loading}
+                  className="bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                      Loading...
+                    </span>
+                  ) : (
+                    'Load More Media'
+                  )}
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

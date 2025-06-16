@@ -8,7 +8,7 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { auth } from '../../firebase/config';
 
 import { UserCredential } from 'firebase/auth';
 

@@ -1,26 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-import { useAuth } from '../../context/AuthContext';
+import { useRecipeStore, useAuthStore } from '../../../store';
+import MediaSelector from '../../../components/MediaSelector';
 
 // These interfaces are used in the form state
 // They're defined inline for better type checking
 
 export default function NewRecipe() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  
+  // Get recipe store actions and state
+  const { createRecipe, error: recipeError } = useRecipeStore();
   
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    prepTime: '',
+    cookTime: '',
     totalTime: '',
     servings: '',
+    difficulty: 'medium',
     categories: {
       breakfast: false,
       lunch: false,
@@ -38,16 +43,40 @@ export default function NewRecipe() {
       fat: '',
       carbs: ''
     },
+    media: [] as { url: string, type: string, name: string }[],
     ingredients: [{ name: '', quantity: '', unit: '' }],
     steps: [{ description: '' }],
     notes: ''
   });
+  
+  // State for media-related errors
+  const [mediaError, setMediaError] = useState('');
+  
+  // Set local error state when recipe store error changes
+  useEffect(() => {
+    if (recipeError) {
+      setError(recipeError);
+    }
+  }, [recipeError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
+    
+    // Update the form data
+    setFormData(prevData => {
+      const updatedData = {
+        ...prevData,
+        [name]: value
+      };
+      
+      // If prep time or cook time changed, calculate total time
+      if (name === 'prepTime' || name === 'cookTime') {
+        const prepTimeNum = parseInt(name === 'prepTime' ? value : prevData.prepTime) || 0;
+        const cookTimeNum = parseInt(name === 'cookTime' ? value : prevData.cookTime) || 0;
+        updatedData.totalTime = (prepTimeNum + cookTimeNum).toString();
+      }
+      
+      return updatedData;
     });
   };
 
@@ -124,10 +153,28 @@ export default function NewRecipe() {
     }
   };
 
+  const handleMediaChange = (selectedMedia: Array<{ id: string; url: string; type: string; name?: string }>) => {
+    setFormData(prevData => ({
+      ...prevData,
+      media: selectedMedia.map(media => ({
+        url: media.url,
+        type: media.type,
+        name: media.name || ''
+      }))
+    }));
+    setMediaError('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
+
+    if (!user) {
+      setError('You must be logged in to create a recipe');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       // Validate form
@@ -152,25 +199,19 @@ export default function NewRecipe() {
         throw new Error('At least one step is required');
       }
 
-      // Create recipe document
-      const recipeData = {
+      // Use the Zustand store to create the recipe
+      const recipeId = await createRecipe({
         ...formData,
         ingredients: filteredIngredients,
         steps: filteredSteps,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        chefId: user?.uid,
-        chefEmail: user?.email
-      };
+        userId: user.uid
+      });
 
-      // Add to Firestore
-      await addDoc(collection(db, 'recipes'), recipeData);
-      
-      // Redirect to the recipes list
-      router.push('/recipes');
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create recipe';
-      setError(errorMessage);
+      // Redirect to the recipe page
+      router.push(`/recipes/${recipeId}`);
+    } catch (err) {
+      console.error('Error creating recipe:', err);
+      setError('Failed to create recipe. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -192,6 +233,12 @@ export default function NewRecipe() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-slate-900 shadow rounded-lg p-6 border border-primary">
+          {/* Display media upload errors */}
+          {mediaError && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-300 rounded-lg">
+              {mediaError}
+            </div>
+          )}
           {error && (
             <div className="mb-6 p-4 bg-red-900/30 border border-red-800 text-red-300 rounded-lg flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -251,18 +298,46 @@ export default function NewRecipe() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                <div>
+                  <label htmlFor="prepTime" className="block text-sm font-medium text-gray-300 mb-1">
+                    Prep Time (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    id="prepTime"
+                    name="prepTime"
+                    value={formData.prepTime}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="cookTime" className="block text-sm font-medium text-gray-300 mb-1">
+                    Cook Time (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    id="cookTime"
+                    name="cookTime"
+                    value={formData.cookTime}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                
                 <div>
                   <label htmlFor="totalTime" className="block text-sm font-medium text-gray-300 mb-1">
-                    Total Cook Time (minutes)
+                    Total Time (minutes)
                   </label>
                   <input
                     type="number"
                     id="totalTime"
                     name="totalTime"
                     value={formData.totalTime}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    readOnly
+                    className="w-full px-3 py-2 bg-slate-800 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
 
@@ -278,6 +353,23 @@ export default function NewRecipe() {
                     onChange={handleChange}
                     className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
+                </div>
+                
+                <div>
+                  <label htmlFor="difficulty" className="block text-sm font-medium text-gray-300 mb-1">
+                    Difficulty
+                  </label>
+                  <select
+                    id="difficulty"
+                    name="difficulty"
+                    value={formData.difficulty}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
                 </div>
               </div>
 
@@ -389,6 +481,26 @@ export default function NewRecipe() {
               />
             </div>
 
+            {/* Media Files */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
+                <h2 className="text-lg font-medium text-white">Media Files</h2>
+              </div>
+              <div className="mb-4">
+                <p className="text-sm text-gray-400 mb-2">Add photos or videos of your recipe (max 10 files)</p>
+                <MediaSelector 
+                  selectedMedia={formData.media.map(media => ({
+                    id: media.name, // Use name as id since our existing media objects don't have id
+                    url: media.url,
+                    type: media.type,
+                    name: media.name
+                  }))} 
+                  onChange={handleMediaChange}
+                  maxFiles={10}
+                />
+              </div>
+            </div>
+            
             {/* Nutrition Per Serving */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">

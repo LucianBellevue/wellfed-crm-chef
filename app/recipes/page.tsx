@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db } from '../../firebase/config';
 import { useAuth } from '../context/AuthContext';
 
 interface Recipe {
