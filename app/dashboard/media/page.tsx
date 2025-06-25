@@ -75,6 +75,7 @@ export default function MediaPage() {
   const [hasMore, setHasMore] = useState(true);
   const [itemsPerPage] = useState(9); // Show 9 items per page (3x3 grid)
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   // Store last document for pagination
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
@@ -190,69 +191,6 @@ export default function MediaPage() {
     setHasMore(true);
     lastDocRef.current = null;
   }, [user]);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user || !e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
-    setUploading(true);
-    setUploadProgress(0);
-    setError('');
-    setSuccess('');
-    
-    try {
-      // Create a storage reference
-      const storageRef = ref(storage, `media/${user.uid}/${Date.now()}-${file.name}`);
-      
-      // Upload file with progress tracking
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(Math.round(progress));
-        },
-        (error) => {
-          console.error('Upload error:', error);
-          setError('Failed to upload file');
-          setUploading(false);
-        },
-        async () => {
-          // Upload completed successfully
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Save file metadata to Firestore
-          await addDoc(collection(db, 'mediaFiles'), {
-            userId: user.uid,
-            name: file.name,
-            type: file.type,
-            url: downloadURL,
-            description: description,
-            createdAt: new Date(),
-            size: file.size
-          });
-          
-          setSuccess('File uploaded successfully');
-          setDescription('');
-          setUploading(false);
-          setUploadProgress(0);
-          
-          // Reset file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          
-          // Refresh file list
-          fetchMediaFiles();
-        }
-      );
-    } catch (err) {
-      console.error('Error during upload:', err);
-      setError('Failed to upload file');
-      setUploading(false);
-    }
-  };
 
   const handleDeleteFile = async (fileId: string, fileUrl: string) => {
     if (!user || !window.confirm('Are you sure you want to delete this file?')) return;
@@ -374,7 +312,13 @@ const getFileTypeIcon = (type: string) => {
               type="file"
               id="file"
               ref={fileInputRef}
-              onChange={handleFileUpload}
+              onChange={e => {
+                if (e.target.files && e.target.files.length > 0) {
+                  setSelectedFile(e.target.files[0]);
+                } else {
+                  setSelectedFile(null);
+                }
+              }}
               disabled={uploading}
               className="w-full bg-slate-900 border border-primary rounded-lg px-4 py-2 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-600"
             />
@@ -407,6 +351,63 @@ const getFileTypeIcon = (type: string) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Upload Button between sections */}
+      <div className="flex justify-center mb-8">
+        <button
+          className="bg-primary hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-lg shadow transition"
+          onClick={async () => {
+            if (!selectedFile) return;
+            setUploading(true);
+            setUploadProgress(0);
+            setError('');
+            setSuccess('');
+            try {
+              if (!user) throw new Error('No user');
+              const storageRef = ref(storage, `media/${user.uid}/${Date.now()}-${selectedFile.name}`);
+              const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+              uploadTask.on(
+                'state_changed',
+                (snapshot) => {
+                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                  setUploadProgress(Math.round(progress));
+                },
+                (error) => {
+                  console.error('Upload error:', error);
+                  setError('Failed to upload file');
+                  setUploading(false);
+                },
+                async () => {
+                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                  await addDoc(collection(db, 'mediaFiles'), {
+                    userId: user.uid,
+                    name: selectedFile.name,
+                    type: selectedFile.type,
+                    url: downloadURL,
+                    description: description,
+                    createdAt: new Date(),
+                    size: selectedFile.size
+                  });
+                  setSuccess('File uploaded successfully');
+                  setDescription('');
+                  setUploading(false);
+                  setUploadProgress(0);
+                  setSelectedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  fetchMediaFiles();
+                }
+              );
+            } catch (err) {
+              console.error('Error during upload:', err);
+              setError('Failed to upload file');
+              setUploading(false);
+            }
+          }}
+          disabled={uploading || !selectedFile}
+        >
+          Upload
+        </button>
       </div>
 
       <div className="bg-slate-900 border border-primary rounded-xl p-6 shadow-md">
