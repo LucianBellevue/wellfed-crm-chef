@@ -9,6 +9,7 @@ import { BASE_URL, DELETE_RECEPIES, GET_RECEPIES } from '@/constants/api';
 
 interface Recipe {
   id: string;
+  _id?: string;
   name: string;
   description: string;
   createdAt: {
@@ -142,7 +143,7 @@ export default function Recipes() {
                 </thead>
                 <tbody className="bg-slate-900 divide-y divide-slate-900">
                   {recipes.map((recipe) => (
-                    <tr key={recipe.id}>
+                    <tr key={recipe._id || recipe.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-white">{recipe.name}</div>
                       </td>

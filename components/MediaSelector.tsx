@@ -16,9 +16,10 @@ interface MediaSelectorProps {
   selectedMedia: MediaFile[];
   onChange: (media: MediaFile[]) => void;
   maxFiles?: number;
+  compact?: boolean;
 }
 
-export default function MediaSelector({ selectedMedia = [], onChange, maxFiles = 10 }: MediaSelectorProps) {
+export default function MediaSelector({ selectedMedia = [], onChange, maxFiles = 10, compact = false }: MediaSelectorProps) {
   const { user } = useAuthStore();
   const router = useRouter();
   const { 
@@ -72,6 +73,33 @@ export default function MediaSelector({ selectedMedia = [], onChange, maxFiles =
   const removeSelectedMedia = (mediaId: string) => {
     onChange(selectedMedia.filter(item => item.id !== mediaId));
   };
+  
+  if (compact) {
+    return (
+      <label className="bg-primary hover:bg-slate-900 border border-primary text-white py-1 px-2 rounded text-xs cursor-pointer">
+        Select image/video
+        <input
+          type="file"
+          accept="image/*,video/*"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            // Generate a local URL for preview (optional)
+            const url = URL.createObjectURL(file);
+            const type = file.type.startsWith('image') ? 'image' : 'video';
+            const newMedia = {
+              id: url,
+              url,
+              type,
+              name: file.name,
+            };
+            onChange([...(selectedMedia || []), newMedia]);
+          }}
+        />
+      </label>
+    );
+  }
   
   return (
     <div className="space-y-4">

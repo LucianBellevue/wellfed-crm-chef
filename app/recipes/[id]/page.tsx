@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRecipeStore, useAuthStore } from '../../../store';
 import MediaSelector from '../../../components/MediaSelector';
 import { useAuth } from '@/app/context/AuthContext';
+import StepMediaUploader from '../../../components/StepMediaUploader';
+import { BASE_URL } from '@/constants/api';
 
 // These interfaces are used in the form state
 // They're defined inline for better type checking
@@ -28,7 +30,12 @@ export default function CreateUpdateRecipe() {
 
   useEffect(() => { 
     if (currentRecipe) {
-      setFormData(currentRecipe);
+      // Only set non-step fields from currentRecipe
+      const { steps, ...rest } = currentRecipe;
+      setFormData(prev => ({
+        ...prev,
+        ...rest
+      }));
     }
   }, [currentRecipe]);
   
@@ -59,7 +66,7 @@ export default function CreateUpdateRecipe() {
     },
     media: [] as { url: string, type: string, name: string }[],
     ingredients: [{ name: '', quantity: '', unit: '' }],
-    steps: [{ description: '', step: 0 }],
+    steps: [{ _id: 'init-0', id: 'init-0', description: '', step: 0, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }],
     notes: ''
   });
 
@@ -123,10 +130,10 @@ export default function CreateUpdateRecipe() {
     const { value } = e.target;
     const updatedSteps = [...formData.steps];
     updatedSteps[index] = {
+      ...updatedSteps[index],
       description: value,
       step: index + 1
     };
-    
     setFormData({
       ...formData,
       steps: updatedSteps
@@ -154,7 +161,7 @@ export default function CreateUpdateRecipe() {
   const addStep = () => {
     setFormData({
       ...formData,
-      steps: [...formData.steps, { description: '', step: formData.steps.length + 1 }]
+      steps: [...formData.steps, { _id: `${Date.now()}`, id: `${Date.now()}`, description: '', step: formData.steps.length + 1, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }]
     });
   };
 
@@ -162,9 +169,10 @@ export default function CreateUpdateRecipe() {
     if (formData.steps.length > 1) {
       const updatedSteps = [...formData.steps];
       updatedSteps.splice(index, 1);
+      // Re-index steps to ensure array is contiguous and index+1 is always correct
       setFormData({
         ...formData,
-        steps: updatedSteps
+        steps: updatedSteps.map((step, idx) => ({ ...step, _id: step._id || `${idx}`, id: step.id || `${idx}` }))
       });
     }
   };
@@ -216,12 +224,28 @@ export default function CreateUpdateRecipe() {
       }
 
       // Use the Zustand store to create the recipe
-      const recipeId = await createUpdateRecipie(id !== 'new' && id ? id as string : undefined, {
+      await createUpdateRecipie(id !== 'new' && id ? id as string : undefined, {
         ...formData,
         ingredients: filteredIngredients,
         steps: filteredSteps,
         userId: user.uid
       });
+      const recipeIdToUse = id;
+
+      // Save each step as an instruction document in parallel
+      await Promise.all(filteredSteps.map((step, i) =>
+        fetch(`${BASE_URL}instruction`, {
+          method: step._id ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipeId: recipeIdToUse,
+            stepNumber: i + 1,
+            instruction: step.description,
+            imageUrl: step.imageUrl || '',
+            _id: step._id // Only needed for PUT
+          }),
+        })
+      ));
 
       // Redirect to the recipe page
       router.push(`/dashboard/recipes`);
@@ -230,6 +254,59 @@ export default function CreateUpdateRecipe() {
       setError('Failed to create recipe. Please try again.');
       setIsSubmitting(false);
     }
+  };
+
+  useEffect(() => {
+    async function fetchSteps() {
+      const res = await fetch(`${BASE_URL}instruction/recipe/${id}`);
+      const backendSteps = await res.json();
+      setFormData(prev => ({
+        ...prev,
+        steps: backendSteps.map((step: any, idx: number) => ({
+          _id: step._id || `${idx}`,
+          id: step._id || `${idx}`,
+          description: step.instruction || step.description || '',
+          step: step.stepNumber || step.step || idx + 1,
+          imageUrl: step.imageUrl || '',
+        }))
+      }));
+    }
+    if (id && id !== 'new') {
+      fetchSteps();
+    }
+  }, [id]);
+
+  const [recipeMedia, setRecipeMedia] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function fetchRecipeMedia() {
+      const res = await fetch(`${BASE_URL}recipe/${id}/media`);
+      const data = await res.json();
+      setRecipeMedia(Array.isArray(data) ? data : []);
+    }
+    if (id) fetchRecipeMedia();
+  }, [id]);
+
+  const handleRecipeMediaUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('userId', user?.uid || '');
+    const res = await fetch(`${BASE_URL}recipe/${id}/media`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    setRecipeMedia(data);
+  };
+
+  const handleRecipeMediaRemove = async (imageUrl: string) => {
+    await fetch(`${BASE_URL}recipe/${id}/media`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user?.uid || '', imageUrl }),
+    });
+    setRecipeMedia(recipeMedia.filter(url => url !== imageUrl));
   };
 
   return (
@@ -499,21 +576,47 @@ export default function CreateUpdateRecipe() {
 
             {/* Media Files */}
             <div className="mb-8">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
-                <h2 className="text-lg font-medium text-white">Media Files</h2>
-              </div>
-              <div className="mb-4">
-                <p className="text-sm text-gray-400 mb-2">Add photos or videos of your recipe (max 10 files)</p>
-                <MediaSelector 
-                  selectedMedia={formData.media.map(media => ({
-                    id: media.name, // Use name as id since our existing media objects don't have id
-                    url: media.url,
-                    type: media.type,
-                    name: media.name
-                  }))} 
-                  onChange={handleMediaChange}
-                  maxFiles={10}
-                />
+              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-primary text-white">Recipe Images</h2>
+              <p className="text-sm text-gray-400 mb-2">Add photos or videos of your recipe (max 10 files)</p>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={e => {
+                  if (e.target.files?.[0]) handleRecipeMediaUpload(e.target.files[0]);
+                }}
+                disabled={recipeMedia.length >= 10}
+              />
+              <button
+                type="button"
+                className="bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-4 rounded-md mb-4"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={recipeMedia.length >= 10}
+              >
+                {recipeMedia.length >= 10 ? 'Maximum Files Selected' : 'Select image'}
+              </button>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {(Array.isArray(recipeMedia) ? recipeMedia : []).map(url => (
+                  <div key={url} className="relative group">
+                    <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden">
+                      {url.match(/\.(mp4|mov)$/i) ? (
+                        <video src={url} controls className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <img src={url} alt="Recipe media" className="w-full h-full object-cover rounded-lg" />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRecipeMediaRemove(url)}
+                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
             
@@ -683,7 +786,7 @@ export default function CreateUpdateRecipe() {
               </div>
 
               {formData.steps.map((step, index) => (
-                <div key={index} className="flex items-start gap-4 mb-3">
+                <div key={step._id || index} className="flex items-start gap-4 mb-3">
                   <div className="flex-grow">
                     <div className="flex items-center mb-1">
                       <span className="font-medium text-white">Step {index + 1}</span>
@@ -695,6 +798,19 @@ export default function CreateUpdateRecipe() {
                       onChange={(e) => handleStepChange(index, e)}
                       className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                     />
+                    <div className="mt-2">
+                      <StepMediaUploader
+                        recipeId={id as string}
+                        stepNumber={index + 1}
+                        userId={user?.uid || ''}
+                        imageUrl={step.imageUrl || null}
+                        onMediaChange={(newUrl) => {
+                          const updatedSteps = [...formData.steps];
+                          updatedSteps[index].imageUrl = newUrl || '';
+                          setFormData({ ...formData, steps: updatedSteps });
+                        }}
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"

@@ -23,6 +23,7 @@ import {
   startAfter
 } from 'firebase/firestore';
 import { db, storage } from '../../../firebase/config';
+import { BASE_URL, GET_RECEPIES } from '@/constants/api';
 
 interface MediaFile {
   id: string;
@@ -79,6 +80,9 @@ export default function MediaPage() {
   
   // Store last document for pagination
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
+
+  const [recipes, setRecipes] = useState<any[]>([]);
+  const [recipeMedia, setRecipeMedia] = useState<{ [key: string]: string[] }>({});
 
   // Function to fetch initial media files with pagination
   const fetchMediaFiles = useCallback(async () => {
@@ -261,6 +265,31 @@ const getFileTypeIcon = (type: string) => {
       );
     }
   };
+
+  // Fetch all recipes for the chef
+  useEffect(() => {
+    async function fetchRecipes() {
+      if (!user?.uid) return;
+      const res = await fetch(`${BASE_URL}${GET_RECEPIES}?page=1&limit=100&type=chef&userId=${user.uid}`);
+      const data = await res.json();
+      setRecipes(data.recipes || []);
+    }
+    fetchRecipes();
+  }, [user]);
+
+  // For each recipe, fetch its media
+  useEffect(() => {
+    async function fetchAllRecipeMedia() {
+      const mediaMap: { [key: string]: string[] } = {};
+      await Promise.all((recipes || []).map(async (recipe) => {
+        const res = await fetch(`${BASE_URL}recipe/${recipe._id || recipe.id}/media`);
+        const urls = await res.json();
+        mediaMap[recipe._id || recipe.id] = Array.isArray(urls) ? urls : [];
+      }));
+      setRecipeMedia(mediaMap);
+    }
+    if (recipes.length) fetchAllRecipeMedia();
+  }, [recipes]);
 
   // Only show loading spinner on initial load
   if (loading && files.length === 0) {
@@ -492,6 +521,27 @@ const getFileTypeIcon = (type: string) => {
             )}
           </>
         )}
+      </div>
+
+      {/* Recipe Media Section */}
+      <div className="mt-12 mb-12">
+        <h2 className="text-2xl font-bold text-white mb-6">Your Recipe Images</h2>
+        {(recipes || []).map(recipe => (
+          <div key={recipe._id || recipe.id} className="mb-8">
+            <h3 className="text-lg font-bold mb-2 text-primary">{recipe.name}</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {(recipeMedia[recipe._id || recipe.id] || []).map(url => (
+                <div key={url} className="aspect-square bg-gray-800 rounded-lg overflow-hidden">
+                  {url.match(/\.(mp4|mov)$/i) ? (
+                    <video src={url} controls className="w-full h-full object-cover rounded-lg" />
+                  ) : (
+                    <img src={url} alt="Recipe media" className="w-full h-full object-cover rounded-lg" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
