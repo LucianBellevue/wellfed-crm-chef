@@ -11,53 +11,54 @@ import { useRecipeStore, type Recipe } from '../../../store/recipeStore';
 export default function RecipesPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const { 
-    recipes, 
-    loading, 
-    loadingMore, 
-    error, 
-    hasMore, 
-    fetchRecipes, 
-    loadMoreRecipes, 
-    resetPagination 
+  const {
+    recipes,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    currentPage,
+    fetchRecipes,
+    loadMoreRecipes,
+    resetPagination
   } = useRecipeStore();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
-  
+
   // Initialize recipes with pagination when component mounts or user changes
   useEffect(() => {
     if (user) {
       resetPagination();
-      fetchRecipes(user.uid);
+      fetchRecipes(user.uid, 1, '', 'all', 'newest');
     }
   }, [user, fetchRecipes, resetPagination]);
-  
+
   // Apply filters and sorting to recipes
   const applyFiltersAndSort = useCallback(() => {
     if (!recipes.length) {
       setFilteredRecipes([]);
       return;
     }
-    
+
     let result = [...recipes];
-    
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(recipe => 
-        recipe.name?.toLowerCase().includes(term) || 
+      result = result.filter(recipe =>
+        recipe.name?.toLowerCase().includes(term) ||
         recipe.description?.toLowerCase().includes(term)
       );
     }
-    
+
     // Apply difficulty filter
     if (filter !== 'all') {
       result = result.filter(recipe => recipe.difficulty?.toLowerCase() === filter.toLowerCase());
     }
-    
+
     // Apply sorting
     if (sortBy === 'newest') {
       result.sort((a, b) => {
@@ -80,25 +81,32 @@ export default function RecipesPage() {
         return timeA - timeB;
       });
     }
-    
+
     setFilteredRecipes(result);
+    // fetchRecipes(user?.uid || '', 1, searchTerm, filter, sortBy);
   }, [recipes, searchTerm, filter, sortBy]);
-  
+
   // Apply filters when filter criteria or recipes change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [recipes, searchTerm, filter, sortBy, applyFiltersAndSort]);
-  
+  }, [recipes, searchTerm, filter, sortBy]);
+
+  useEffect(() => {
+    if (user) {
+      fetchRecipes(user.uid, 1, searchTerm, filter, sortBy);
+    }
+  }, [filter, sortBy]);
+
   // Check if we need to load more recipes when filters change
   useEffect(() => {
     if (filteredRecipes.length < 6 && hasMore && recipes.length > 0 && !loading && !loadingMore) {
       // If we have fewer than 6 filtered recipes, try to load more
       if (user) {
-        loadMoreRecipes(user.uid);
+        //  loadMoreRecipes(user.uid);
       }
     }
   }, [filteredRecipes.length, hasMore, recipes.length, loading, loadingMore, loadMoreRecipes, user]);
-  
+
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   }, []);
@@ -113,21 +121,21 @@ export default function RecipesPage() {
 
   const formatTime = (minutes: string): string => {
     if (!minutes) return 'Not specified';
-    
+
     const mins = parseInt(minutes, 10);
     if (isNaN(mins)) return minutes;
-    
+
     if (mins < 60) {
       return `${mins} min`;
     }
-    
+
     const hours = Math.floor(mins / 60);
     const remainingMinutes = mins % 60;
-    
+
     if (remainingMinutes === 0) {
       return `${hours} hr`;
     }
-    
+
     return `${hours} hr ${remainingMinutes} min`;
   };
 
@@ -186,8 +194,17 @@ export default function RecipesPage() {
               onChange={handleSearchChange}
               className="w-full bg-slate-900 border border-primary rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
+            <button
+              className="absolute right-0 top-0 h-full  bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-6 rounded-md transition-colors disabled:opacity-50"
+
+              onClick={() => {
+                fetchRecipes(user?.uid || '', 1, searchTerm, filter, sortBy);
+              }}
+            > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg></button>
           </div>
-          
+
           <div className="flex flex-col md:flex-row gap-4">
             <div className="w-full md:w-auto">
               <select
@@ -201,7 +218,7 @@ export default function RecipesPage() {
                 <option value="hard">Hard</option>
               </select>
             </div>
-            
+
             <div className="w-full md:w-auto">
               <select
                 value={sortBy}
@@ -214,7 +231,7 @@ export default function RecipesPage() {
                 <option value="prep-time">Prep Time</option>
               </select>
             </div>
-            
+
             <Link
               href="/recipes/new"
               className="w-full md:w-auto px-6 py-2 bg-primary border border-primary hover:bg-slate-900 hover:border-primary text-white font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center justify-center"
@@ -268,8 +285,8 @@ export default function RecipesPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredRecipes.map((recipe) => (
-              <div 
-                key={recipe.id} 
+              <div
+                key={recipe.id}
                 className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-lg transition-transform hover:scale-[1.02]"
               >
                 <div className="relative h-48 w-full">
@@ -289,20 +306,20 @@ export default function RecipesPage() {
                       </svg>
                     </div>
                   )}
-                  
+
                   <div className="absolute top-2 right-2">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getDifficultyColor(recipe.difficulty)}`}>
                       {recipe.difficulty || 'Not Set'}
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="p-4">
                   <h3 className="text-xl font-semibold text-white mb-2 line-clamp-1">{recipe.name}</h3>
                   <p className="text-gray-400 text-sm mb-4 line-clamp-2">
                     {recipe.description || 'No description provided'}
                   </p>
-                  
+
                   <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
                     <div className="flex items-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -310,7 +327,7 @@ export default function RecipesPage() {
                       </svg>
                       <span>{formatTime(recipe.totalTime)}</span>
                     </div>
-                    
+
                     <div className="flex items-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -318,7 +335,7 @@ export default function RecipesPage() {
                       <span>{recipe.servings || 'Not specified'}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-2">
                     <button
                       onClick={() => router.push(`/recipes/${recipe.id}`)}
@@ -327,7 +344,7 @@ export default function RecipesPage() {
                       View
                     </button>
                     <Link
-                      href={`/recipes/edit/${recipe.id}`}
+                      href={`/recipes/${recipe.id}`}
                       className="bg-slate-700 hover:bg-slate-900 border border-slate-700 text-white py-2 px-4 rounded-md"
                     >
                       Edit
@@ -337,12 +354,12 @@ export default function RecipesPage() {
               </div>
             ))}
           </div>
-          
+
           {/* Load More Button */}
           {hasMore && (
             <div className="mt-8 text-center">
               <button
-                onClick={() => user && loadMoreRecipes(user.uid)}
+                onClick={() => user && fetchRecipes(user.uid, currentPage + 1, searchTerm, filter, sortBy)}
                 disabled={loadingMore}
                 className="bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-6 rounded-md transition-colors disabled:opacity-50"
               >

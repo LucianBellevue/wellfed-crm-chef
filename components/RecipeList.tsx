@@ -26,7 +26,7 @@ export default function RecipeList() {
     if (user && recipes.length === 0) {
       // Reset pagination and fetch initial batch
       resetPagination();
-      fetchRecipes(user.uid);
+      fetchRecipes(user.uid, 1, '', 'all', 'newest');
     }
   }, [user, recipes.length, fetchRecipes, resetPagination]);
   
@@ -133,7 +133,7 @@ export default function RecipeList() {
                 <h3 className="text-xl font-semibold text-white mb-2 flex-grow">{recipe.name}</h3>
                 <div className="flex space-x-2">
                   <Link 
-                    href={`/recipes/edit/${recipe.id}`}
+                    href={`/recipes/${recipe.id}`}
                     className="text-blue-400 hover:text-blue-300"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

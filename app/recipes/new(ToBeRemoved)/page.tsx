@@ -5,18 +5,19 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRecipeStore, useAuthStore } from '../../../store';
 import MediaSelector from '../../../components/MediaSelector';
+import { useAuth } from '@/app/context/AuthContext';
 
 // These interfaces are used in the form state
 // They're defined inline for better type checking
 
 export default function NewRecipe() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   
   // Get recipe store actions and state
-  const { createRecipe, error: recipeError } = useRecipeStore();
+  const { createUpdateRecipie, error: recipeError } = useRecipeStore();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -189,7 +190,10 @@ export default function NewRecipe() {
       
       const filteredSteps = formData.steps.filter(
         step => step.description.trim() !== ''
-      );
+      ).map((step, index) => ({
+        ...step,
+        step: index + 1
+      }));
 
       if (filteredIngredients.length === 0) {
         throw new Error('At least one ingredient is required');
@@ -200,7 +204,7 @@ export default function NewRecipe() {
       }
 
       // Use the Zustand store to create the recipe
-      const recipeId = await createRecipe({
+      const recipeId = await createUpdateRecipie(undefined, {
         ...formData,
         ingredients: filteredIngredients,
         steps: filteredSteps,

@@ -1,90 +1,107 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../../firebase/config';
-import { useAuth } from '../../context/AuthContext';
+import { useRecipeStore, useAuthStore } from '../../../store';
+import MediaSelector from '../../../components/MediaSelector';
+import { useAuth } from '@/app/context/AuthContext';
 
-interface Ingredient {
-  name: string;
-  quantity: string;
-  unit: string;
-}
+// These interfaces are used in the form state
+// They're defined inline for better type checking
 
-interface Step {
-  description: string;
-}
-
-interface RecipeData {
-  name: string;
-  description: string;
-  prepTime: string;
-  cookTime: string;
-  servings: string;
-  difficulty: string;
-  cuisine: string;
-  ingredients: Ingredient[];
-  steps: Step[];
-  notes: string;
-  chefId: string;
-  chefEmail: string;
-  createdAt: {
-    toDate: () => Date;
-  } | null;
-}
-
-export default function EditRecipe({ params }: { params: { id: string } }) {
+export default function CreateUpdateRecipe() {
   const router = useRouter();
-  const { } = useAuth(); // Auth context available for future use
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const { id } = useParams();
+
+  // Get recipe store actions and state
+  const { createUpdateRecipie, fetchRecipeById, error: recipeError, currentRecipe } = useRecipeStore();
+
+  useEffect(() => {
+    if (id && id !== 'new') {
+      fetchRecipeById(id as string);
+    }
+  }, [id]);
+
+  useEffect(() => { 
+    if (currentRecipe) {
+      setFormData(currentRecipe);
+    }
+  }, [currentRecipe]);
   
-  const [formData, setFormData] = useState<RecipeData>({
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
     prepTime: '',
     cookTime: '',
+    totalTime: '',
     servings: '',
     difficulty: 'medium',
+    categories: {
+      breakfast: false,
+      lunch: false,
+      dinner: false,
+      beverage: false,
+      desserts: false,
+      appetizer: false,
+      snack: false
+    },
     cuisine: '',
+    tools: '',
+    nutrition: {
+      calories: '',
+      protein: '',
+      fat: '',
+      carbs: ''
+    },
+    media: [] as { url: string, type: string, name: string }[],
     ingredients: [{ name: '', quantity: '', unit: '' }],
-    steps: [{ description: '' }],
-    notes: '',
-    chefId: '',
-    chefEmail: '',
-    createdAt: null
+    steps: [{ description: '', step: 0 }],
+    notes: ''
   });
 
+  
+  // State for media-related errors
+  const [mediaError, setMediaError] = useState('');
+  
+  // Set local error state when recipe store error changes
   useEffect(() => {
-    const fetchRecipe = async () => {
-      try {
-        const recipeRef = doc(db, 'recipes', params.id);
-        const recipeSnap = await getDoc(recipeRef);
-        
-        if (recipeSnap.exists()) {
-          setFormData(recipeSnap.data() as RecipeData);
-        } else {
-          setError('Recipe not found');
-        }
-      } catch (err) {
-        console.error('Error fetching recipe:', err);
-        setError('Failed to load recipe');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRecipe();
-  }, [params.id]);
+    if (recipeError) {
+      setError(recipeError);
+    }
+  }, [recipeError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    // Update the form data
+    setFormData(prevData => {
+      const updatedData = {
+        ...prevData,
+        [name]: value
+      };
+      
+      // If prep time or cook time changed, calculate total time
+      if (name === 'prepTime' || name === 'cookTime') {
+        const prepTimeNum = parseInt(name === 'prepTime' ? value : prevData.prepTime) || 0;
+        const cookTimeNum = parseInt(name === 'cookTime' ? value : prevData.cookTime) || 0;
+        updatedData.totalTime = (prepTimeNum + cookTimeNum).toString();
+      }
+      
+      return updatedData;
+    });
+  };
+
+  const handleCategoryChange = (category: string) => {
     setFormData({
       ...formData,
-      [name]: value
+      categories: {
+        ...formData.categories,
+        [category]: !formData.categories[category as keyof typeof formData.categories]
+      }
     });
   };
 
@@ -106,7 +123,8 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
     const { value } = e.target;
     const updatedSteps = [...formData.steps];
     updatedSteps[index] = {
-      description: value
+      description: value,
+      step: index + 1
     };
     
     setFormData({
@@ -136,7 +154,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
   const addStep = () => {
     setFormData({
       ...formData,
-      steps: [...formData.steps, { description: '' }]
+      steps: [...formData.steps, { description: '', step: formData.steps.length + 1 }]
     });
   };
 
@@ -151,10 +169,28 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
     }
   };
 
+  const handleMediaChange = (selectedMedia: Array<{ id: string; url: string; type: string; name?: string }>) => {
+    setFormData(prevData => ({
+      ...prevData,
+      media: selectedMedia.map(media => ({
+        url: media.url,
+        type: media.type,
+        name: media.name || ''
+      }))
+    }));
+    setMediaError('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
+
+    if (!user) {
+      setError('You must be logged in to create a recipe');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       // Validate form
@@ -179,43 +215,31 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
         throw new Error('At least one step is required');
       }
 
-      // Update recipe document
-      const recipeData = {
+      // Use the Zustand store to create the recipe
+      const recipeId = await createUpdateRecipie(id !== 'new' && id ? id as string : undefined, {
         ...formData,
         ingredients: filteredIngredients,
         steps: filteredSteps,
-        updatedAt: serverTimestamp()
-      };
+        userId: user.uid
+      });
 
-      // Update in Firestore
-      const recipeRef = doc(db, 'recipes', params.id);
-      await updateDoc(recipeRef, recipeData);
-      
-      // Redirect to the recipes list
-      router.push('/recipes');
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update recipe';
-      setError(errorMessage);
+      // Redirect to the recipe page
+      router.push(`/dashboard/recipes`);
+    } catch (err) {
+      console.error('Error creating recipe:', err);
+      setError('Failed to create recipe. Please try again.');
       setIsSubmitting(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <p className="text-gray-300">Loading recipe...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
       <header className="bg-slate-900 shadow border-b border-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">Edit Recipe</h1>
+          <h1 className="text-2xl font-bold text-white">{id !== 'new' ? 'Edit Recipe' : 'Create New Recipe'}</h1>
           <div className="flex items-center space-x-4">
-            <Link href="/recipes" className="text-primary-300 hover:text-primary-200 transition-colors">
+            <Link href="/recipes" className="text-primary hover:text-primary-400 transition-colors">
               Back to Recipes
             </Link>
           </div>
@@ -224,7 +248,13 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-slate-800 shadow rounded-lg p-6 border border-slate-700">
+        <div className="bg-slate-900 shadow rounded-lg p-6 border border-primary">
+          {/* Display media upload errors */}
+          {mediaError && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-300 rounded-lg">
+              {mediaError}
+            </div>
+          )}
           {error && (
             <div className="mb-6 p-4 bg-red-900/30 border border-red-800 text-red-300 rounded-lg flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -237,7 +267,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
           <form onSubmit={handleSubmit}>
             {/* Basic Info */}
             <div className="mb-8">
-              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-slate-700 text-white">Basic Information</h2>
+              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-gray-700 text-white">Basic Information</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -250,7 +280,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                     required
                   />
                 </div>
@@ -265,7 +295,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                     name="cuisine"
                     value={formData.cuisine}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
               </div>
@@ -280,7 +310,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                   rows={3}
                   value={formData.description}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                 />
               </div>
 
@@ -295,10 +325,10 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                     name="prepTime"
                     value={formData.prepTime}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
-
+                
                 <div>
                   <label htmlFor="cookTime" className="block text-sm font-medium text-gray-300 mb-1">
                     Cook Time (minutes)
@@ -309,7 +339,21 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                     name="cookTime"
                     value={formData.cookTime}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="totalTime" className="block text-sm font-medium text-gray-300 mb-1">
+                    Total Time (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    id="totalTime"
+                    name="totalTime"
+                    value={formData.totalTime}
+                    readOnly
+                    className="w-full px-3 py-2 bg-slate-800 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
                 </div>
 
@@ -323,32 +367,252 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                     name="servings"
                     value={formData.servings}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                   />
+                </div>
+                
+                <div>
+                  <label htmlFor="difficulty" className="block text-sm font-medium text-gray-300 mb-1">
+                    Difficulty
+                  </label>
+                  <select
+                    id="difficulty"
+                    name="difficulty"
+                    value={formData.difficulty}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
                 </div>
               </div>
 
               <div className="mt-4">
-                <label htmlFor="difficulty" className="block text-sm font-medium text-gray-300 mb-1">
-                  Difficulty
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Categories
                 </label>
-                <select
-                  id="difficulty"
-                  name="difficulty"
-                  value={formData.difficulty}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
-                >
-                  <option value="easy" className="bg-slate-700">Easy</option>
-                  <option value="medium" className="bg-slate-700">Medium</option>
-                  <option value="hard" className="bg-slate-700">Hard</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="breakfast"
+                      checked={formData.categories?.breakfast}
+                      onChange={() => handleCategoryChange('breakfast')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="breakfast" className="ml-2 text-sm text-gray-300">
+                      Breakfast
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="lunch"
+                      checked={formData.categories?.lunch}
+                      onChange={() => handleCategoryChange('lunch')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="lunch" className="ml-2 text-sm text-gray-300">
+                      Lunch
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="dinner"
+                      checked={formData.categories?.dinner}
+                      onChange={() => handleCategoryChange('dinner')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="dinner" className="ml-2 text-sm text-gray-300">
+                      Dinner
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="beverage"
+                      checked={formData.categories?.beverage}
+                      onChange={() => handleCategoryChange('beverage')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="beverage" className="ml-2 text-sm text-gray-300">
+                      Beverage
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="desserts"
+                      checked={formData.categories?.desserts}
+                      onChange={() => handleCategoryChange('desserts')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="desserts" className="ml-2 text-sm text-gray-300">
+                      Desserts
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="appetizer"
+                      checked={formData.categories?.appetizer}
+                      onChange={() => handleCategoryChange('appetizer')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="appetizer" className="ml-2 text-sm text-gray-300">
+                      Appetizer
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="snack"
+                      checked={formData.categories?.snack}
+                      onChange={() => handleCategoryChange('snack')}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-600 bg-slate-900 rounded"
+                    />
+                    <label htmlFor="snack" className="ml-2 text-sm text-gray-300">
+                      Snack
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tools Required */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
+                <h2 className="text-lg font-medium text-white">Tools Required</h2>
+              </div>
+              <textarea
+                id="tools"
+                name="tools"
+                value={formData.tools}
+                onChange={handleChange}
+                placeholder="List any special tools or equipment needed (e.g., blender, food processor, dutch oven)"
+                className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400 min-h-[80px]"
+              />
+            </div>
+
+            {/* Media Files */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
+                <h2 className="text-lg font-medium text-white">Media Files</h2>
+              </div>
+              <div className="mb-4">
+                <p className="text-sm text-gray-400 mb-2">Add photos or videos of your recipe (max 10 files)</p>
+                <MediaSelector 
+                  selectedMedia={formData.media.map(media => ({
+                    id: media.name, // Use name as id since our existing media objects don't have id
+                    url: media.url,
+                    type: media.type,
+                    name: media.name
+                  }))} 
+                  onChange={handleMediaChange}
+                  maxFiles={10}
+                />
+              </div>
+            </div>
+            
+            {/* Nutrition Per Serving */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
+                <h2 className="text-lg font-medium text-white">Nutrition Per Serving</h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label htmlFor="calories" className="block text-sm font-medium text-gray-300 mb-1">
+                    Calories
+                  </label>
+                  <input
+                    type="number"
+                    id="calories"
+                    name="nutrition.calories"
+                    value={formData.nutrition.calories}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          calories: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="protein" className="block text-sm font-medium text-gray-300 mb-1">
+                    Protein (g)
+                  </label>
+                  <input
+                    type="number"
+                    id="protein"
+                    name="nutrition.protein"
+                    value={formData.nutrition.protein}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          protein: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="fat" className="block text-sm font-medium text-gray-300 mb-1">
+                    Fat (g)
+                  </label>
+                  <input
+                    type="number"
+                    id="fat"
+                    name="nutrition.fat"
+                    value={formData.nutrition.fat}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          fat: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="carbs" className="block text-sm font-medium text-gray-300 mb-1">
+                    Carbs (g)
+                  </label>
+                  <input
+                    type="number"
+                    id="carbs"
+                    name="nutrition.carbs"
+                    value={formData.nutrition.carbs}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        nutrition: {
+                          ...formData.nutrition,
+                          carbs: e.target.value
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Ingredients */}
             <div className="mb-8">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
                 <h2 className="text-lg font-medium text-white">Ingredients</h2>
                 <button
                   type="button"
@@ -369,7 +633,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                         placeholder="Ingredient name"
                         value={ingredient.name}
                         onChange={(e) => handleIngredientChange(index, e)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                        className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                       />
                     </div>
                     <div>
@@ -379,7 +643,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                         placeholder="Quantity"
                         value={ingredient.quantity}
                         onChange={(e) => handleIngredientChange(index, e)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                        className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                       />
                     </div>
                     <div>
@@ -389,7 +653,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                         placeholder="Unit (g, ml, tsp, etc.)"
                         value={ingredient.unit}
                         onChange={(e) => handleIngredientChange(index, e)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                        className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                       />
                     </div>
                   </div>
@@ -407,7 +671,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
 
             {/* Steps */}
             <div className="mb-8">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-primary">
                 <h2 className="text-lg font-medium text-white">Preparation Steps</h2>
                 <button
                   type="button"
@@ -429,7 +693,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                       rows={2}
                       value={step.description}
                       onChange={(e) => handleStepChange(index, e)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                      className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                     />
                   </div>
                   <button
@@ -446,14 +710,14 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
 
             {/* Notes */}
             <div className="mb-8">
-              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-slate-700 text-white">Additional Notes</h2>
+              <h2 className="text-lg font-medium mb-4 pb-2 border-b border-primary text-white">Additional Notes</h2>
               <textarea
                 id="notes"
                 name="notes"
                 rows={4}
                 value={formData.notes}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
+                className="w-full px-3 py-2 bg-slate-900 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-white placeholder-gray-400"
                 placeholder="Any additional notes, tips, or variations..."
               />
             </div>
@@ -465,7 +729,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
                 disabled={isSubmitting}
                 className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-800 transition-colors shadow-button focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Update Recipe'}
+                {isSubmitting ? 'Saving...' : 'Save Recipe'}
               </button>
             </div>
           </form>
@@ -474,3 +738,4 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
     </div>
   );
 }
+

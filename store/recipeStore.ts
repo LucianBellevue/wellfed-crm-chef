@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, orderBy, limit, startAfter, DocumentSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { BASE_URL, GET_RECEPIES, POST_RECEPIES } from '@/constants/api';
+import router from 'next/router';
 
 // Define Recipe interface
 export interface Recipe {
@@ -31,7 +33,7 @@ export interface Recipe {
   };
   media: { url: string, type: string, name: string }[];
   ingredients: { name: string, quantity: string, unit: string }[];
-  steps: { description: string }[];
+  steps: { description: string, step: number }[];
   notes: string;
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
@@ -48,11 +50,13 @@ interface RecipeState {
   success: string | null;
   hasMore: boolean;
   lastDoc: DocumentSnapshot | null;
-  fetchRecipes: (userId: string) => Promise<void>;
+  currentPage: number;
+  fetchRecipes: (userId: string, page: number, searchTerm: string, difficulty: string, sortBy: string) => Promise<void>;
   loadMoreRecipes: (userId: string) => Promise<void>;
   resetPagination: () => void;
   fetchRecipeById: (recipeId: string) => Promise<void>;
   createRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  createUpdateRecipie: (id: string | undefined, recipeData: Recipe) => Promise<void>;
   updateRecipe: (recipeId: string, recipeData: Partial<Recipe>) => Promise<void>;
   deleteRecipe: (recipeId: string) => Promise<void>;
   clearCurrentRecipe: () => void;
@@ -73,6 +77,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   hasMore: true,
   lastDoc: null,
   success: null,
+  currentPage: 1,
 
   // Reset pagination
   resetPagination: () => {
@@ -80,44 +85,46 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   },
 
   // Fetch all recipes for a user
-  fetchRecipes: async (userId: string) => {
-    set({ loading: true, error: null, recipes: [], lastDoc: null, hasMore: true });
+  fetchRecipes: async (userId: string, page: number = 1, searchTerm: string = '', difficulty: string = '', sortBy: string = '') => {
+    set({ loading: true, error: null, recipes: [], lastDoc: null, hasMore: true, currentPage: page });
     try {
+      set({ loadingMore: true, error: null });
       const ITEMS_PER_PAGE = 6;
-      const recipesQuery = query(
-        collection(db, 'recipes'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(ITEMS_PER_PAGE)
-      );
-      const querySnapshot = await getDocs(recipesQuery);
-      const recipesData: Recipe[] = [];
+
+      const res = await fetch(`${BASE_URL}${GET_RECEPIES}?page=${page}&limit=${ITEMS_PER_PAGE}&type=chef&userId=${userId}&searchTerm=${searchTerm}&difficulty=${difficulty}&sortBy=${sortBy}`);
+      const data = await res.json();
+      const recipesList = data.recipes as Recipe[];
       
+      const { lastDoc, hasMore, recipes, currentPage } = get();
+      
+      const recipesData: Recipe[] = [...recipes];
+      recipesData.push(...recipesList);
       // Save the last document for pagination
-      if (!querySnapshot.empty) {
-        set({ lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1] });
+      if (recipesList.length > 0) {
+
+        if(data.total > recipesData.length) {
+        set({ hasMore: true });
+        }
+        else {
+          set({ hasMore: false });
+        }
       } else {
         set({ hasMore: false });
-      }
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as Omit<Recipe, 'id'>;
-        recipesData.push({
-          id: doc.id,
-          ...data
-        });
-      });
+      } 
+
+  
+      set({ loadingMore: false, error: null });
       set({ recipes: recipesData, loading: false });
     } catch (error) {
       console.error('Error fetching recipes:', error);
       set({ error: 'Failed to fetch recipes', loading: false });
     }
   },
-  
+
   loadMoreRecipes: async (userId: string) => {
     const { lastDoc, hasMore, recipes } = get();
     if (!lastDoc || !hasMore) return;
-    
+
     set({ loadingMore: true, error: null });
     try {
       const ITEMS_PER_PAGE = 6;
@@ -128,18 +135,18 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
         startAfter(lastDoc),
         limit(ITEMS_PER_PAGE)
       );
-      
+
       const querySnapshot = await getDocs(recipesQuery);
-      
+
       // If no more documents, set hasMore to false
       if (querySnapshot.empty) {
         set({ hasMore: false, loadingMore: false });
         return;
       }
-      
+
       // Save the last document for next pagination
       const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-      
+
       const newRecipes: Recipe[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data() as Omit<Recipe, 'id'>;
@@ -148,14 +155,14 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
           ...data
         });
       });
-      
+
       // Update recipes state with new recipes
-      set({ 
+      set({
         recipes: [...recipes, ...newRecipes],
         lastDoc: newLastDoc,
-        loadingMore: false 
+        loadingMore: false
       });
-      
+
     } catch (error) {
       console.error('Error loading more recipes:', error);
       set({ error: 'Failed to load more recipes', loadingMore: false });
@@ -166,16 +173,18 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   fetchRecipeById: async (recipeId: string) => {
     set({ loading: true, error: null });
     try {
-      const recipeDoc = await getDoc(doc(db, 'recipes', recipeId));
-      
-      if (recipeDoc.exists()) {
-        const recipeData = recipeDoc.data() as Omit<Recipe, 'id'>;
-        set({ 
+      const res = await fetch(`${BASE_URL}${GET_RECEPIES}${recipeId}`);
+      const data = await res.json();
+      // const recipeDoc = await getDoc(doc(db, 'recipes', recipeId));
+
+      if (data) {
+        const recipeData = data as Omit<Recipe, 'id'>;
+        set({
           currentRecipe: {
-            id: recipeDoc.id,
+            id: data._id,
             ...recipeData
           },
-          loading: false 
+          loading: false
         });
       } else {
         set({ error: 'Recipe not found', loading: false });
@@ -196,16 +205,18 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-      
+
       const docRef = await addDoc(collection(db, 'recipes'), recipeWithTimestamps);
-      
+
       // Update the recipes list with the new recipe
       const recipes = get().recipes;
-      set({ 
+      set({
         recipes: [...recipes, { id: docRef.id, ...recipe }],
-        loading: false 
+        loading: false
       });
-      
+
+
+
       return docRef.id;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create recipe';
@@ -215,29 +226,52 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     }
   },
 
+  createUpdateRecipie: async (id: string | undefined, recipeData: Recipe) => {
+    try {
+      const profileUpdateUrl = id !== undefined && id !== 'undefined' ? (BASE_URL + POST_RECEPIES + '/' + id) : (BASE_URL + POST_RECEPIES);
+
+      const body = recipeData;
+
+      const res = await fetch(profileUpdateUrl, {
+        method: id ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      router.push('/recipes');
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  },
+
+
+
   // Update an existing recipe
   updateRecipe: async (recipeId: string, recipeData: Partial<Recipe>) => {
     set({ loading: true, error: null });
     try {
       const recipeRef = doc(db, 'recipes', recipeId);
-      
+
       await updateDoc(recipeRef, {
         ...recipeData,
         updatedAt: serverTimestamp()
       });
-      
+
       // Update the recipes list and current recipe if it's being viewed
-      const recipes = get().recipes.map(recipe => 
+      const recipes = get().recipes.map(recipe =>
         recipe.id === recipeId ? { ...recipe, ...recipeData } : recipe
       );
-      
+
       const currentRecipe = get().currentRecipe;
-      set({ 
+      set({
         recipes,
-        currentRecipe: currentRecipe?.id === recipeId 
+        currentRecipe: currentRecipe?.id === recipeId
           ? { ...currentRecipe, ...recipeData }
           : currentRecipe,
-        loading: false 
+        loading: false
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update recipe';
@@ -251,16 +285,16 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await deleteDoc(doc(db, 'recipes', recipeId));
-      
+
       // Remove the recipe from the recipes list
       const recipes = get().recipes.filter(recipe => recipe.id !== recipeId);
-      
+
       // Clear current recipe if it's the one being deleted
       const currentRecipe = get().currentRecipe;
-      set({ 
+      set({
         recipes,
         currentRecipe: currentRecipe?.id === recipeId ? null : currentRecipe,
-        loading: false 
+        loading: false
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete recipe';

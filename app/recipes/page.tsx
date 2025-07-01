@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../context/AuthContext';
+import { BASE_URL, DELETE_RECEPIES, GET_RECEPIES } from '@/constants/api';
 
 interface Recipe {
   id: string;
@@ -13,51 +14,71 @@ interface Recipe {
   createdAt: {
     toDate: () => Date;
   } | null;
+  updatedAt: {
+    toDate: () => Date;
+  } | null;
 }
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
-  const { } = useAuth(); // Auth context available for future use
+  const { user } = useAuth(); // Auth context available for future use
 
   useEffect(() => {
-    const fetchRecipes = async () => {
-      try {
-        const recipesCollection = collection(db, 'recipes');
-        const recipesSnapshot = await getDocs(recipesCollection);
-        const recipesList = recipesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Recipe[];
-        
-        // Sort by creation date (newest first)
-        recipesList.sort((a, b) => {
-          const dateA = a.createdAt?.toDate();
-          const dateB = b.createdAt?.toDate();
-          
-          if (!dateA && !dateB) return 0;
-          if (!dateA) return 1;
-          if (!dateB) return -1;
-          
-          return dateB.getTime() - dateA.getTime();
-        });
-        
-        setRecipes(recipesList);
-      } catch (error) {
-        console.error('Error fetching recipes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  
+    if (user && user.uid) {
+      fetchRecipes();
+    }
+  }, [user]);
 
-    fetchRecipes();
-  }, []);
+  const fetchRecipes = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}${GET_RECEPIES}?page=1&limit=10&type=chef&userId=${user?.uid}`);
+      const data = await res.json();
+      const recipesList = data.recipes as Recipe[];
+      // const recipesList = recipesSnapshot.docs.map(doc => ({
+      //   id: doc.id,
+      //   ...doc.data()
+      // })) as Recipe[];
+      
+      // Sort by creation date (newest first)
+      recipesList.sort((a, b) => {
+        const getDate = (recipe: Recipe) => {
+          const timestamp = recipe.createdAt || recipe.updatedAt;
+          if (!timestamp) return null;
+          return typeof timestamp === 'string' ? new Date(timestamp) : timestamp.toDate();
+        };
+        
+        const dateA = getDate(a);
+        const dateB = getDate(b);
+        
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      setRecipes(recipesList);
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this recipe?')) {
       try {
-        await deleteDoc(doc(db, 'recipes', id));
-        setRecipes(recipes.filter(recipe => recipe.id !== id));
+        const res = await fetch(`${BASE_URL}${DELETE_RECEPIES}${id}`, {
+          method: 'DELETE',
+        });
+        if (res.ok) {
+          fetchRecipes();
+        }
+        // await deleteDoc(doc(db, 'recipes', id));
+        // setRecipes(recipes.filter(recipe => recipe.id !== id));
       } catch (error) {
         console.error('Error deleting recipe:', error);
       }
