@@ -8,3 +8,8 @@ export const GET_SEARCH_BY_PREFERENCES = 'recipe/search-by-preferences/'
 export const GET_SAVED_RECEPIES = 'savedrecipes/user/'
 export const PUT_FAV_RECEPIES = 'savedrecipes/fav/'
 export const DELETE_RECEPIES = 'recipe/chef-recipie/'
+export const GET_PROFILE = 'profile/'
+export const POST_PROFILE = 'profile'
+export const PUT_PROFILE = 'profile/'
+export const UPLOAD_API = 'upload/'
+

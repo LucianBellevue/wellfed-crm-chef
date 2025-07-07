@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useProfileStore, useAuthStore } from '../store';
+import { useAuth } from '@/app/context/AuthContext';
+import { BASE_URL, POST_PROFILE } from '@/constants/api';
 
 // Separate loading component
 const LoadingSpinner = () => (
@@ -22,7 +24,7 @@ const LazyImage = ({ src, alt, className, fill, style }: {
   const [isLoaded, setIsLoaded] = useState(false);
   
   return (
-    <div className="relative">
+    <div className="">
       {!isLoaded && <div className="absolute inset-0 flex items-center justify-center bg-slate-800"><LoadingSpinner /></div>}
       <Image 
         src={src} 
@@ -38,7 +40,7 @@ const LazyImage = ({ src, alt, className, fill, style }: {
 };
 
 export default function ProfileManager() {
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const { 
     profile, 
     loading, 
@@ -46,6 +48,7 @@ export default function ProfileManager() {
     success, 
     fetchProfile, 
     updateProfile, 
+    createProfile,
     uploadProfileImage, 
     uploadBannerImage,
     removeProfileImage,
@@ -53,13 +56,28 @@ export default function ProfileManager() {
   } = useProfileStore();
   
   const [formData, setFormData] = useState({
-    displayName: '',
+    displayName: user?.displayName || '',
     bio: '',
     specialty: '',
     location: '',
     website: '',
-    phone: ''
+    phone: '',
+    email: ''
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        displayName: user.displayName || '',
+        bio: '',
+        specialty: '',
+        location: '',
+        website: '',
+        phone: '',
+        email: user.email || '',
+      });
+    }
+  }, [user]); 
   
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
@@ -69,21 +87,22 @@ export default function ProfileManager() {
   
   // Fetch profile data when component mounts, but only if not already loaded
   useEffect(() => {
-    if (user && !profile) {
+    if (user && !profile.id) {
       fetchProfile(user.uid);
     }
   }, [user, profile, fetchProfile]);
   
   // Update form data when profile changes
   useEffect(() => {
-    if (profile) {
+    if (profile && profile.id) {
       setFormData({
-        displayName: profile.displayName || '',
+        displayName: profile.firstName || '',
         bio: profile.aboutMe || '', // Map aboutMe to bio in our form
         specialty: profile.specialty || '',
         location: profile.location || '',
         website: profile.socialLinks?.website || '',
-        phone: profile.contactEmail || '' // Use contactEmail as phone for now
+        phone: profile.phoneNumber || '', // Use contactEmail as phone for now
+        email: profile.email || ''
       });
     }
   }, [profile]);
@@ -100,11 +119,26 @@ export default function ProfileManager() {
     if (e.target.files && e.target.files[0]) {
       setProfileImageFile(e.target.files[0]);
     }
+
+    const file = e.target.files?.[0];
+
+    if(user && file){
+      uploadProfileImage(user.uid, file, 'profile')
+    }
+
+
   };
   
   const handleBannerImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setBannerImageFile(e.target.files[0]);
+    }
+
+
+    const file = e.target.files?.[0];
+
+    if(user && file){
+      uploadProfileImage(user.uid, file, 'banner')
     }
   };
   
@@ -121,7 +155,12 @@ export default function ProfileManager() {
         aboutMe: formData.bio, // Map bio to aboutMe
         specialty: formData.specialty,
         location: formData.location,
-        contactEmail: formData.phone, // Map phone to contactEmail
+        phoneNumber: formData.phone, // Map phone to contactEmail
+        role: 'chef',
+        email: formData.email,
+        authId: user.uid,
+        firstName: formData.displayName,
+        lastName: formData.displayName,
         socialLinks: {
           website: formData.website,
           // Preserve other social links if they exist
@@ -131,21 +170,27 @@ export default function ProfileManager() {
       
       // Create an array of promises to execute in parallel
       const updatePromises = [];
+
+      if(profile?.id){
+        updatePromises.push(updateProfile(user.uid, profileData));
+      }else{
+        updatePromises.push(createProfile(profileData));
+      }
       
       // Add profile update promise
-      updatePromises.push(updateProfile(user.uid, profileData));
+      // updatePromises.push(updateProfile(user.uid, profileData));
       
       // Add image upload promises if needed
-      if (profileImageFile) {
-        updatePromises.push(uploadProfileImage(user.uid, profileImageFile));
-      }
+      // if (profileImageFile) {
+      //   updatePromises.push();
+      // }
       
       if (bannerImageFile) {
         updatePromises.push(uploadBannerImage(user.uid, bannerImageFile));
       }
       
-      // Execute all promises in parallel
-      await Promise.all(updatePromises);
+      // // Execute all promises in parallel
+      // await Promise.all(updatePromises);
       
       // Reset file inputs
       setProfileImageFile(null);
@@ -167,7 +212,7 @@ export default function ProfileManager() {
     if (!user) return;
     
     try {
-      await removeProfileImage(user.uid);
+      await removeProfileImage(user.uid, 'profile');
       setShowRemoveProfileDialog(false);
     } catch (err) {
       console.error('Error removing profile image:', err);
@@ -178,7 +223,7 @@ export default function ProfileManager() {
     if (!user) return;
     
     try {
-      await removeBannerImage(user.uid);
+      await removeProfileImage(user.uid, 'banner');
       setShowRemoveBannerDialog(false);
     } catch (err) {
       console.error('Error removing banner image:', err);
@@ -212,14 +257,14 @@ export default function ProfileManager() {
         <div className="mb-6">
           <h3 className="text-xl font-semibold mb-2">Banner Image</h3>
           <div className="relative w-full h-48 bg-gray-500 rounded-lg overflow-hidden mb-2">
-            {profile?.bannerImageUrl ? (
+            {profile?.profileBannerURL ? (
               <>
                 <LazyImage 
-                  src={profile.bannerImageUrl} 
+                  src={profile.profileBannerURL} 
                   alt="Banner" 
                   fill 
                   style={{ objectFit: 'cover' }}
-                  className="rounded-lg"
+                  className="rounded-lg h-auto"
                 />
                 <button
                   type="button"
@@ -239,7 +284,7 @@ export default function ProfileManager() {
           </div>
           <div className="flex items-center">
             <label className="bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-4 rounded cursor-pointer">
-              {profile?.bannerImageUrl ? 'Change Banner' : 'Upload Banner'}
+              {profile?.profileBannerURL ? 'Change Banner' : 'Upload Banner'}
               <input 
                 type="file" 
                 accept="image/*" 
@@ -260,10 +305,10 @@ export default function ProfileManager() {
           <h3 className="text-xl font-semibold mb-2">Profile Image</h3>
           <div className="flex items-center space-x-4">
             <div className="relative w-24 h-24 bg-gray-500 rounded-full overflow-hidden">
-              {profile?.profileImageUrl ? (
+              {profile?.profilePictureURL ? (
                 <>
                   <LazyImage 
-                    src={profile.profileImageUrl} 
+                    src={profile.profilePictureURL} 
                     alt="Profile" 
                     fill 
                     style={{ objectFit: 'cover' }}
@@ -287,7 +332,7 @@ export default function ProfileManager() {
             </div>
             <div className="flex items-center">
               <label className="bg-primary hover:bg-slate-900 border border-primary text-white py-2 px-4 rounded cursor-pointer">
-                {profile?.profileImageUrl ? 'Change Photo' : 'Upload Photo'}
+                {profile?.profilePictureURL ? 'Change Photo' : 'Upload Photo'}
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -384,6 +429,21 @@ export default function ProfileManager() {
                 placeholder="Your phone number"
               />
             </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full bg-slate-900/70 border border-primary rounded-md py-2 px-3 text-white"
+                placeholder="Your email address"
+              />
+            </div>
+
+            
           </div>
           
           <div className="pt-4">
