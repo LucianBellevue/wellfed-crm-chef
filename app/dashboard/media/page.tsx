@@ -4,25 +4,15 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { DocumentSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  ref, 
-  uploadBytesResumable, 
-  getDownloadURL, 
-  deleteObject
-} from 'firebase/storage';
-import { 
   collection, 
-  addDoc, 
   query, 
   where, 
   getDocs, 
-  deleteDoc, 
-  doc,
   orderBy,
   limit,
-  startAfter,
-  updateDoc
+  startAfter
 } from 'firebase/firestore';
-import { db, storage } from '../../../firebase/config';
+import { db } from '../../../firebase/config';
 import { BASE_URL, POST_MEDIA, GET_MEDIA } from '@/constants/api';
 
 // Import components
@@ -44,12 +34,12 @@ export default function MediaPage() {
   const [recipesLoading, setRecipesLoading] = useState(true);
   const [recipeMediaLoading, setRecipeMediaLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [description, setDescription] = useState('');
-  const [hasMore, setHasMore] = useState(true);
-  const [itemsPerPage] = useState(9); // Show 9 items per page (3x3 grid)
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [itemsPerPage] = useState<number>(9); // Show 9 items per page (3x3 grid)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
@@ -60,7 +50,7 @@ export default function MediaPage() {
   const [recipeMedia, setRecipeMedia] = useState<{ [key: string]: string[] }>({});
   
   // UI rendering states
-  const [uiReady, setUiReady] = useState(false);
+  const [uiReady, setUiReady] = useState<boolean>(false);
   
   // Modal state
   const [selectedMedia, setSelectedMedia] = useState<MediaFile | null>(null);
@@ -90,7 +80,7 @@ export default function MediaPage() {
         size: file.size || 0, // fallback if size is missing
       }));
       setFiles(mappedFiles);
-    } catch (err) {
+    } catch {
       setError('Failed to load media files');
     } finally {
       setMediaLoading(false);
@@ -182,9 +172,10 @@ export default function MediaPage() {
       setDescription('');
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      fetchMediaFiles();
+      await fetchMediaFiles();
     } catch (err) {
       setError('Failed to upload file');
+      console.error('Upload error:', err);
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -210,6 +201,7 @@ export default function MediaPage() {
       setRecipesLoading(true);
       try {
         const res = await fetch(`${BASE_URL}${GET_MEDIA}?page=1&limit=100&type=chef&userId=${user.uid}`);
+        if (!res.ok) throw new Error('Failed to fetch recipes');
         const data = await res.json();
         setRecipes(data.recipes || []);
       } catch (err) {
@@ -233,6 +225,7 @@ export default function MediaPage() {
           const recipeId = recipe._id || recipe.id;
           if (recipeId) {
             const res = await fetch(`${BASE_URL}recipe/${recipeId}/media`);
+            if (!res.ok) throw new Error(`Failed to fetch media for recipe ${recipeId}`);
             const urls = await res.json();
             mediaMap[recipeId] = Array.isArray(urls) ? urls : [];
           }
@@ -281,8 +274,12 @@ export default function MediaPage() {
         <MediaPreviewModal 
           file={selectedMedia} 
           onClose={() => setSelectedMedia(null)} 
-          onDelete={async () => {}} // TODO: Implement delete via API if needed
-          onReplace={async () => {}} // TODO: Implement replace via API if needed
+          onDelete={async () => {
+            // TODO: Implement delete via API if needed
+          }} 
+          onReplace={async () => {
+            // TODO: Implement replace via API if needed
+          }}
         />
       )}
 
@@ -326,7 +323,9 @@ export default function MediaPage() {
                   <MediaCard
                     key={file.id || file.url}
                     file={file}
-                    onDelete={() => {}} // TODO: Implement delete via API if needed
+                    onDelete={() => {
+                      // TODO: Implement delete via API if needed
+                    }}
                     formatFileSize={formatFileSize}
                     onClick={(file) => setSelectedMedia(file)}
                   />
