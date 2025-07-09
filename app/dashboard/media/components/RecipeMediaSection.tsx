@@ -1,5 +1,4 @@
 import React from 'react';
-import Image from 'next/image';
 import { Recipe } from './types';
 
 interface RecipeMediaSectionProps {
@@ -24,14 +23,7 @@ export const RecipeMediaSection = ({ recipes, recipeMedia }: RecipeMediaSectionP
                   {url.match(/\.(mp4|mov)$/i) ? (
                     <video src={url} controls className="w-full h-full object-cover rounded-lg" />
                   ) : (
-                    <Image 
-                      src={url} 
-                      alt="Recipe media" 
-                      width={500} 
-                      height={500} 
-                      className="object-cover rounded-lg" 
-                      style={{ width: '100%', height: '100%' }}
-                    />
+                    <img src={url} alt="Recipe media" className="w-full h-full object-cover rounded-lg" />
                   )}
                 </div>
               ))}

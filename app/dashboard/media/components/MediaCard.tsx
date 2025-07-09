@@ -11,12 +11,13 @@ interface MediaCardProps {
 }
 
 export const MediaCard = ({ file, onDelete, formatFileSize, onClick }: MediaCardProps) => {
+  if (!file || !file.type) return null;
   return (
     <div 
       className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 hover:border-primary transition-all cursor-pointer"
       onClick={() => onClick(file)}
     >
-      {file.type.startsWith('image/') && (
+      {file.type && file.type.startsWith('image/') && (
         <div className="relative">
           <LazyMediaThumbnail file={file} />
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-40 transition-all">

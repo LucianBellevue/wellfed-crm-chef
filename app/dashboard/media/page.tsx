@@ -23,7 +23,7 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import { db, storage } from '../../../firebase/config';
-import { BASE_URL, GET_RECEPIES } from '@/constants/api';
+import { BASE_URL, POST_MEDIA, GET_MEDIA } from '@/constants/api';
 
 // Import components
 import { MediaFile, Recipe } from './components/types';
@@ -65,50 +65,38 @@ export default function MediaPage() {
   // Modal state
   const [selectedMedia, setSelectedMedia] = useState<MediaFile | null>(null);
 
-  // Function to fetch initial media files with pagination
+  // Fetch media files from backend API
   const fetchMediaFiles = useCallback(async () => {
     if (!user) return;
-
+    setMediaLoading(true);
+    setError('');
     try {
-      setMediaLoading(true);
-      setError('');
-      
-      // Create query with pagination
-      const mediaQuery = query(
-        collection(db, 'mediaFiles'),
-        where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(itemsPerPage)
-      );
-      
-      const mediaSnapshot = await getDocs(mediaQuery);
-      
-      if (mediaSnapshot.empty) {
-        setFiles([]);
-        setHasMore(false);
-        setMediaLoading(false);
-        return;
-      }
-      
-      // Store the last document for pagination
-      lastDocRef.current = mediaSnapshot.docs[mediaSnapshot.docs.length - 1];
-      
-      const mediaFiles = mediaSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date()
-      })) as MediaFile[];
-      
-      setFiles(mediaFiles);
-      setHasMore(mediaSnapshot.docs.length === itemsPerPage);
-      setMediaLoading(false);
+      const res = await fetch(`${BASE_URL}${GET_MEDIA}?userId=${user.uid}`);
+      if (!res.ok) throw new Error('Failed to fetch media files');
+      const data = await res.json();
+      // Always treat as array and map backend fields to frontend fields
+      const filesArray = Array.isArray(data)
+        ? data
+        : data && typeof data === 'object'
+          ? [data]
+          : [];
+      const mappedFiles = filesArray.map(file => ({
+        id: file._id,
+        name: file.filename,
+        type: file.type || 'image/jpeg', // fallback if type is missing
+        url: file.url,
+        description: file.description,
+        createdAt: file.createdAt,
+        size: file.size || 0, // fallback if size is missing
+      }));
+      setFiles(mappedFiles);
     } catch (err) {
-      console.error('Error fetching media files:', err);
       setError('Failed to load media files');
+    } finally {
       setMediaLoading(false);
     }
-  }, [user, itemsPerPage]);
-  
+  }, [user]);
+
   // Function to load more media files
   const loadMoreFiles = useCallback(async () => {
     if (!user || !lastDocRef.current) return;
@@ -173,105 +161,33 @@ export default function MediaPage() {
     lastDocRef.current = null;
   }, [user]);
 
-  const handleDeleteFile = async (fileId: string, fileUrl: string) => {
-    if (!user) return;
-    
+  // Upload file to backend API (which handles Azure Blob Storage)
+  const handleUpload = async () => {
+    if (!selectedFile || !user) return;
+    setUploading(true);
+    setUploadProgress(0);
+    setError('');
+    setSuccess('');
     try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, 'mediaFiles', fileId));
-      
-      // Delete from Storage
-      const storageRef = ref(storage, fileUrl);
-      await deleteObject(storageRef);
-      
-      // Update UI
-      setFiles(files.filter(file => file.id !== fileId));
-      setSuccess('File deleted successfully');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('description', description);
+      formData.append('userId', user.uid);
+      const res = await fetch(`${BASE_URL}${POST_MEDIA}`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Failed to upload file');
+      setSuccess('File uploaded successfully');
+      setDescription('');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      fetchMediaFiles();
     } catch (err) {
-      console.error('Error deleting file:', err);
-      setError('Failed to delete file');
-    }
-  };
-  
-  const handleReplaceFile = async (fileId: string, newFile: File) => {
-    if (!user) return;
-    
-    try {
-      setUploading(true);
-      setUploadProgress(0);
-      
-      // Get the file to replace
-      const fileToReplace = files.find(file => file.id === fileId);
-      if (!fileToReplace) throw new Error('File not found');
-      
-      // Upload new file
-      const storageRef = ref(storage, `media/${user.uid}/${Date.now()}-${newFile.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, newFile);
-      
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(Math.round(progress));
-        },
-        (error) => {
-          console.error('Upload error:', error);
-          setError('Failed to upload replacement file');
-          setUploading(false);
-        },
-        async () => {
-          // Get new download URL
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Delete old file from storage
-          const oldStorageRef = ref(storage, fileToReplace.url);
-          await deleteObject(oldStorageRef).catch(err => {
-            console.error('Error deleting old file:', err);
-          });
-          
-          // Update document in Firestore
-          await updateDoc(doc(db, 'mediaFiles', fileId), {
-            name: newFile.name,
-            type: newFile.type,
-            url: downloadURL,
-            size: newFile.size,
-            updatedAt: new Date()
-          });
-          
-          // Update UI
-          setFiles(prevFiles => prevFiles.map(file => {
-            if (file.id === fileId) {
-              return {
-                ...file,
-                name: newFile.name,
-                type: newFile.type,
-                url: downloadURL,
-                size: newFile.size,
-                updatedAt: new Date()
-              };
-            }
-            return file;
-          }));
-          
-          setSuccess('File replaced successfully');
-          setUploading(false);
-          setUploadProgress(0);
-          
-          // Clear success message after 3 seconds
-          setTimeout(() => {
-            setSuccess('');
-          }, 3000);
-        }
-      );
-    } catch (err) {
-      console.error('Error replacing file:', err);
-      setError('Failed to replace file');
+      setError('Failed to upload file');
+    } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -293,7 +209,7 @@ export default function MediaPage() {
       if (!user?.uid) return;
       setRecipesLoading(true);
       try {
-        const res = await fetch(`${BASE_URL}${GET_RECEPIES}?page=1&limit=100&type=chef&userId=${user.uid}`);
+        const res = await fetch(`${BASE_URL}${GET_MEDIA}?page=1&limit=100&type=chef&userId=${user.uid}`);
         const data = await res.json();
         setRecipes(data.recipes || []);
       } catch (err) {
@@ -365,8 +281,8 @@ export default function MediaPage() {
         <MediaPreviewModal 
           file={selectedMedia} 
           onClose={() => setSelectedMedia(null)} 
-          onDelete={handleDeleteFile}
-          onReplace={handleReplaceFile}
+          onDelete={async () => {}} // TODO: Implement delete via API if needed
+          onReplace={async () => {}} // TODO: Implement replace via API if needed
         />
       )}
 
@@ -384,53 +300,7 @@ export default function MediaPage() {
       <div className="flex justify-center mb-8">
         <button
           className="bg-primary hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-lg shadow transition"
-          onClick={async () => {
-            if (!selectedFile) return;
-            setUploading(true);
-            setUploadProgress(0);
-            setError('');
-            setSuccess('');
-            try {
-              if (!user) throw new Error('No user');
-              const storageRef = ref(storage, `media/${user.uid}/${Date.now()}-${selectedFile.name}`);
-              const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-              uploadTask.on(
-                'state_changed',
-                (snapshot) => {
-                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                  setUploadProgress(Math.round(progress));
-                },
-                (error) => {
-                  console.error('Upload error:', error);
-                  setError('Failed to upload file');
-                  setUploading(false);
-                },
-                async () => {
-                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                  await addDoc(collection(db, 'mediaFiles'), {
-                    userId: user.uid,
-                    name: selectedFile.name,
-                    type: selectedFile.type,
-                    url: downloadURL,
-                    description: description,
-                    createdAt: new Date(),
-                    size: selectedFile.size
-                  });
-                  setSuccess('File uploaded successfully');
-                  setDescription('');
-                  setUploading(false);
-                  setUploadProgress(0);
-                  setSelectedFile(null);
-                  if (fileInputRef.current) fileInputRef.current.value = '';
-                  fetchMediaFiles();
-                }
-              );
-            } catch (err) {
-              console.error('Error during upload:', err);
-              setError('Failed to upload file');
-              setUploading(false);
-            }
-          }}
+          onClick={handleUpload}
           disabled={uploading || !selectedFile}
         >
           Upload
@@ -439,7 +309,6 @@ export default function MediaPage() {
 
       <div className="bg-slate-900 border border-primary rounded-xl p-6 shadow-md">
         <h2 className="text-xl font-semibold text-white mb-4 pb-3 border-b border-gray-800">Your Media Files</h2>
-        
         {mediaLoading && files.length === 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, index) => (
@@ -451,29 +320,27 @@ export default function MediaPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {files.map((file) => (
-                <MediaCard 
-                  key={file.id} 
-                  file={file} 
-                  onDelete={handleDeleteFile} 
-                  formatFileSize={formatFileSize}
-                  onClick={(file) => setSelectedMedia(file)}
-                />
-              ))}
-              
-              {/* Show skeletons when loading more */}
-              {mediaLoading && [...Array(3)].map((_, index) => (
-                <MediaCardSkeleton key={`load-more-skeleton-${index}`} />
+              {files
+                .filter(file => file && (file.id || file.url) && file.type)
+                .map((file) => (
+                  <MediaCard
+                    key={file.id || file.url}
+                    file={file}
+                    onDelete={() => {}} // TODO: Implement delete via API if needed
+                    formatFileSize={formatFileSize}
+                    onClick={(file) => setSelectedMedia(file)}
+                  />
               ))}
             </div>
-            
-            {/* Load More Button */}
+            {/* Load More Button inside the box */}
             {hasMore && (
-              <LoadMoreButton 
-                onClick={loadMoreFiles} 
-                loading={mediaLoading} 
-                label="Load More Media" 
-              />
+              <div className="flex justify-center mt-8">
+                <LoadMoreButton 
+                  onClick={loadMoreFiles} 
+                  loading={mediaLoading} 
+                  label="Load More Media" 
+                />
+              </div>
             )}
           </>
         )}

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { collection, addDoc, getDocs, doc, deleteDoc, query, where, orderBy, limit, startAfter, DocumentSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase/config';
+import { BASE_URL, POST_MEDIA } from '../constants/api';
 
 // Define MediaFile interface
 interface MediaFile {
@@ -162,6 +163,7 @@ export const useMediaStore = create<MediaState>((set, get) => ({
 
   // Upload media file
   uploadMediaFile: async (userId: string, file: File, description: string) => {
+    // Use backend API instead of Firebase
     set({ 
       uploadState: {
         isUploading: true,
@@ -171,79 +173,24 @@ export const useMediaStore = create<MediaState>((set, get) => ({
       error: null,
       success: null
     });
-    
     try {
-      // Create a storage reference
-      const storageRef = ref(storage, `media/${userId}/${Date.now()}-${file.name}`);
-      
-      // Upload file with progress tracking
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          set({ 
-            uploadState: {
-              ...get().uploadState,
-              progress: Math.round(progress)
-            }
-          });
-        },
-        (error) => {
-          console.error('Upload error:', error);
-          set({ 
-            uploadState: {
-              isUploading: false,
-              progress: 0,
-              error: 'Failed to upload file'
-            },
-            error: 'Failed to upload file'
-          });
-        },
-        async () => {
-          // Upload completed successfully
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Save file metadata to Firestore
-          await addDoc(collection(db, 'mediaFiles'), {
-            userId: userId,
-            name: file.name,
-            type: file.type,
-            url: downloadURL,
-            description: description,
-            createdAt: new Date(),
-            size: file.size
-          });
-          
-          set({ 
-            uploadState: {
-              isUploading: false,
-              progress: 0,
-              error: null
-            },
-            success: 'File uploaded successfully',
-            description: ''
-          });
-          
-          // Refresh file list
-          get().fetchMediaFiles(userId);
-          
-          // Clear success message after 3 seconds
-          setTimeout(() => {
-            set({ success: null });
-          }, 3000);
-        }
-      );
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', description);
+      formData.append('userId', userId);
+      const res = await fetch(`${BASE_URL}${POST_MEDIA}`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Failed to upload file');
+      set({
+        success: 'File uploaded successfully',
+        uploadState: { isUploading: false, progress: 100, error: null }
+      });
     } catch (err) {
-      console.error('Error during upload:', err);
-      set({ 
-        uploadState: {
-          isUploading: false,
-          progress: 0,
-          error: 'Failed to upload file'
-        },
-        error: 'Failed to upload file'
+      set({
+        error: 'Failed to upload file',
+        uploadState: { isUploading: false, progress: 0, error: 'Failed to upload file' }
       });
     }
   },
