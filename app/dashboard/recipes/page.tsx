@@ -89,13 +89,13 @@ export default function RecipesPage() {
   // Apply filters when filter criteria or recipes change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [recipes, searchTerm, filter, sortBy, applyFiltersAndSort]);
+  }, [recipes, searchTerm, filter, sortBy]);
 
   useEffect(() => {
     if (user) {
       fetchRecipes(user.uid, 1, searchTerm, filter, sortBy);
     }
-  }, [filter, sortBy, fetchRecipes, searchTerm, user]);
+  }, [filter, sortBy]);
 
   // Check if we need to load more recipes when filters change
   useEffect(() => {

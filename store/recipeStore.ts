@@ -85,34 +85,62 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   },
 
   // Fetch all recipes for a user
-  fetchRecipes: async (userId: string, page: number = 1, searchTerm: string = '', difficulty: string = '', sortBy: string = '') => {
-    set({ loading: true, error: null, recipes: [], lastDoc: null, hasMore: true, currentPage: page });
+  fetchRecipes: async (
+    userId: string,
+    page: number = 1,
+    searchTerm: string = '',
+    difficulty: string = '',
+    sortBy: string = ''
+  ) => {
+    set({
+      loading: true,
+      error: null,
+      // Only clear recipes if this is the first page, otherwise keep existing for infinite scroll
+      recipes: page === 1 ? [] : get().recipes,
+      lastDoc: null,
+      hasMore: true,
+      currentPage: page,
+    });
     try {
       set({ loadingMore: true, error: null });
       const ITEMS_PER_PAGE = 6;
 
-      const res = await fetch(`${BASE_URL}${GET_RECEPIES}?page=${page}&limit=${ITEMS_PER_PAGE}&type=chef&userId=${userId}&searchTerm=${searchTerm}&difficulty=${difficulty}&sortBy=${sortBy}`);
+      const res = await fetch(
+        `${BASE_URL}${GET_RECEPIES}?page=${page}&limit=${ITEMS_PER_PAGE}&type=chef&userId=${userId}&searchTerm=${searchTerm}&difficulty=${difficulty}&sortBy=${sortBy}`
+      );
       const data = await res.json();
       const recipesList = data.recipes as Recipe[];
-      
-      const { lastDoc, hasMore, recipes, currentPage } = get();
-      
-      const recipesData: Recipe[] = [...recipes];
-      recipesData.push(...recipesList);
-      // Save the last document for pagination
-      if (recipesList.length > 0) {
 
-        if(data.total > recipesData.length) {
-        set({ hasMore: true });
-        }
-        else {
+      let recipesData: Recipe[];
+      if (page === 1) {
+        // On first page, replace recipes
+        recipesData = [...recipesList];
+      } else {
+        // On subsequent pages, append and deduplicate by id
+        const existing = get().recipes;
+        const all = [...existing, ...recipesList];
+        // Deduplicate by id (or _id fallback)
+        const seen = new Set();
+        recipesData = all.filter((r) => {
+          const id = (r as any).id || (r as any)._id;
+          if (!id) return false;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+      }
+
+      // Set hasMore based on total and loaded
+      if (recipesList.length > 0) {
+        if (data.total > recipesData.length) {
+          set({ hasMore: true });
+        } else {
           set({ hasMore: false });
         }
       } else {
         set({ hasMore: false });
-      } 
+      }
 
-  
       set({ loadingMore: false, error: null });
       set({ recipes: recipesData, loading: false });
     } catch (error) {

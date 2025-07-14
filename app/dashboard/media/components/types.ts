@@ -8,10 +8,10 @@ export interface MediaFile {
   createdAt: Date;
   size: number;
 }
-
 export interface Recipe {
   _id?: string;
   id?: string;
   name: string;
   // Add other recipe properties as needed
 }
+
