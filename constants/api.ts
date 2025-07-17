@@ -1,5 +1,5 @@
-export const BASE_URL = 'http://localhost:3001/'; 
-export const SOCKET_SERVER_URL = 'http://localhost:3001';
+export const BASE_URL = 'https://api.wellfedapp.com/'; 
+export const SOCKET_SERVER_URL = 'https://api.wellfedapp.com';
 
 export const POST_RECEPIES = 'recipe/chef-recipie'
 export const GET_RECEPIES = 'recipe/chef-recipe-page/'
