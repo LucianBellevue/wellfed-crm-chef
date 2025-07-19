@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, orderBy, limit, startAfter, DocumentSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { BASE_URL, GET_RECEPIES, POST_RECEPIES } from '@/constants/api';
-import router from 'next/router';
 
 // Define Recipe interface
 export interface Recipe {
@@ -56,7 +55,7 @@ interface RecipeState {
   resetPagination: () => void;
   fetchRecipeById: (recipeId: string) => Promise<void>;
   createRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  createUpdateRecipie: (id: string | undefined, recipeData: Recipe) => Promise<void>;
+  createUpdateRecipie: (id: string | undefined, recipeData: Recipe) => Promise<string | undefined>;
   updateRecipe: (recipeId: string, recipeData: Partial<Recipe>) => Promise<void>;
   deleteRecipe: (recipeId: string) => Promise<void>;
   clearCurrentRecipe: () => void;
@@ -205,6 +204,8 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
       const data = await res.json();
       // const recipeDoc = await getDoc(doc(db, 'recipes', recipeId));
 
+
+
       if (data) {
         const recipeData = data as Omit<Recipe, 'id'>;
         set({
@@ -255,6 +256,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   },
 
   createUpdateRecipie: async (id: string | undefined, recipeData: Recipe) => {
+    set({ loading: true, error: null });
     try {
       const profileUpdateUrl = id !== undefined && id !== 'undefined' ? (BASE_URL + POST_RECEPIES + '/' + id) : (BASE_URL + POST_RECEPIES);
 
@@ -267,11 +269,22 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
         },
         body: JSON.stringify(body),
       });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const data = await res.json();
-      router.push('/recipes');
+      set({ loading: false, success: id ? 'Recipe updated successfully' : 'Recipe created successfully' });
+      
+      // Return the recipe ID for new recipes
+      return data._id || data.id || id;
 
     } catch (error) {
-      console.error('Error updating profile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save recipe';
+      console.error('Error updating recipe:', error);
+      set({ error: errorMessage, loading: false });
+      throw error;
     }
   },
 

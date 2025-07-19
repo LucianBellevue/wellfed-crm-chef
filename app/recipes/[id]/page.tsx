@@ -17,6 +17,7 @@ export default function CreateUpdateRecipe() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const { id } = useParams();
 
   // Get recipe store actions and state
@@ -29,15 +30,24 @@ export default function CreateUpdateRecipe() {
   }, [id]);
 
   useEffect(() => { 
-    if (currentRecipe) {
-      // Only set non-step fields from currentRecipe
-      const { steps, ...rest } = currentRecipe;
+    if (currentRecipe && !isEditing) {
+      console.log('Setting form data from currentRecipe:', currentRecipe);
+      // Set all fields from currentRecipe including steps
       setFormData(prev => ({
         ...prev,
-        ...rest
+        ...currentRecipe,
+        // Ensure steps have the correct structure
+        steps: currentRecipe.steps?.map((step: any, idx: number) => ({
+          _id: step._id || step.id || `${idx}`,
+          id: step._id || step.id || `${idx}`,
+          description: step.description || step.instruction || '',
+          step: step.step || step.stepNumber || idx + 1,
+          imageUrl: step.imageUrl || '',
+          media: step.media || []
+        })) || [{ _id: 'init-0', id: 'init-0', description: '', step: 1, imageUrl: '', media: [] }]
       }));
     }
-  }, [currentRecipe]);
+  }, [currentRecipe, isEditing]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -66,7 +76,7 @@ export default function CreateUpdateRecipe() {
     },
     media: [] as { url: string, type: string, name: string }[],
     ingredients: [{ name: '', quantity: '', unit: '' }],
-    steps: [{ _id: 'init-0', id: 'init-0', description: '', step: 0, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }],
+    steps: [{ _id: 'init-0', id: 'init-0', description: '', step: 1, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }],
     notes: ''
   });
 
@@ -128,6 +138,7 @@ export default function CreateUpdateRecipe() {
 
   const handleStepChange = (index: number, e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const { value } = e.target;
+    setIsEditing(true);
     const updatedSteps = [...formData.steps];
     updatedSteps[index] = {
       ...updatedSteps[index],
@@ -159,6 +170,7 @@ export default function CreateUpdateRecipe() {
   };
 
   const addStep = () => {
+    setIsEditing(true);
     setFormData({
       ...formData,
       steps: [...formData.steps, { _id: `${Date.now()}`, id: `${Date.now()}`, description: '', step: formData.steps.length + 1, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }]
@@ -166,13 +178,27 @@ export default function CreateUpdateRecipe() {
   };
 
   const removeStep = (index: number) => {
+    setIsEditing(true);
+    
+    // Check if this is the last step with content
+    const stepsWithContent = formData.steps.filter(step => step.description.trim() !== '');
+    if (stepsWithContent.length === 1 && formData.steps[index].description.trim() !== '') {
+      return;
+    }
+    
     if (formData.steps.length > 1) {
       const updatedSteps = [...formData.steps];
       updatedSteps.splice(index, 1);
-      // Re-index steps to ensure array is contiguous and index+1 is always correct
+      // Re-index steps to ensure array is contiguous and step numbers are correct
+      const reindexedSteps = updatedSteps.map((step, idx) => ({ 
+        ...step, 
+        _id: step._id || `${idx}`, 
+        id: step.id || `${idx}`,
+        step: idx + 1 // Ensure step numbers are sequential
+      }));
       setFormData({
         ...formData,
-        steps: updatedSteps.map((step, idx) => ({ ...step, _id: step._id || `${idx}`, id: step.id || `${idx}` }))
+        steps: reindexedSteps
       });
     }
   };
@@ -200,7 +226,14 @@ export default function CreateUpdateRecipe() {
       return;
     }
 
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Save operation timed out. Please try again.')), 30000); // 30 second timeout
+    });
+
     try {
+      await Promise.race([
+        (async () => {
       // Validate form
       if (!formData.name.trim()) {
         throw new Error('Recipe name is required');
@@ -215,6 +248,8 @@ export default function CreateUpdateRecipe() {
         step => step.description.trim() !== ''
       );
 
+
+
       if (filteredIngredients.length === 0) {
         throw new Error('At least one ingredient is required');
       }
@@ -223,58 +258,40 @@ export default function CreateUpdateRecipe() {
         throw new Error('At least one step is required');
       }
 
-      // Use the Zustand store to create the recipe
-      await createUpdateRecipie(id !== 'new' && id ? id as string : undefined, {
+      // Ensure all steps have sequential step numbers
+      const stepsWithCorrectNumbers = filteredSteps.map((step, index) => ({
+        ...step,
+        step: index + 1
+      }));
+
+      // Use the Zustand store to create/update the recipe
+      const recipeId = await createUpdateRecipie(id !== 'new' && id ? id as string : undefined, {
         ...formData,
         ingredients: filteredIngredients,
-        steps: filteredSteps,
+        steps: stepsWithCorrectNumbers,
         userId: user.uid
       });
-      const recipeIdToUse = id;
 
-      // Save each step as an instruction document in parallel
-      await Promise.all(filteredSteps.map((step, i) =>
-        fetch(`${BASE_URL}instruction`, {
-          method: step._id ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipeId: recipeIdToUse,
-            stepNumber: i + 1,
-            instruction: step.description,
-            imageUrl: step.imageUrl || '',
-            _id: step._id // Only needed for PUT
-          }),
-        })
-      ));
+      // Use the returned recipe ID or the existing ID
+      const recipeIdToUse = recipeId || id;
 
-      // Redirect to the recipe page
-      router.push(`/dashboard/recipes`);
+      // Recipe saved successfully with steps included in the recipe data
+      setIsEditing(false);
+
+          // Redirect to the recipe page
+          router.push(`/dashboard/recipes`);
+        })(),
+        timeoutPromise
+      ]);
     } catch (err) {
       console.error('Error creating recipe:', err);
-      setError('Failed to create recipe. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create recipe. Please try again.');
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    async function fetchSteps() {
-      const res = await fetch(`${BASE_URL}instruction/recipe/${id}`);
-      const backendSteps = await res.json();
-      setFormData(prev => ({
-        ...prev,
-        steps: backendSteps.map((step: any, idx: number) => ({
-          _id: step._id || `${idx}`,
-          id: step._id || `${idx}`,
-          description: step.instruction || step.description || '',
-          step: step.stepNumber || step.step || idx + 1,
-          imageUrl: step.imageUrl || '',
-        }))
-      }));
-    }
-    if (id && id !== 'new') {
-      fetchSteps();
-    }
-  }, [id]);
+  // Removed the fetchSteps useEffect - now using steps from recipe data directly
 
   const [recipeMedia, setRecipeMedia] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -784,9 +801,15 @@ export default function CreateUpdateRecipe() {
                   + Add Step
                 </button>
               </div>
+              
+              {formData.steps.filter(step => step.description.trim() !== '').length === 0 && (
+                <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-800 text-yellow-300 rounded-lg">
+                  At least one step with content is required to save the recipe.
+                </div>
+              )}
 
               {formData.steps.map((step, index) => (
-                <div key={step._id || index} className="flex items-start gap-4 mb-3">
+                <div key={`step-${step._id || index}-${index}`} className="flex items-start gap-4 mb-3">
                   <div className="flex-grow">
                     <div className="flex items-center mb-1">
                       <span className="font-medium text-white">Step {index + 1}</span>
@@ -816,7 +839,7 @@ export default function CreateUpdateRecipe() {
                     type="button"
                     onClick={() => removeStep(index)}
                     className="px-3 py-2 text-red-400 hover:text-red-300 transition-colors"
-                    disabled={formData.steps.length <= 1}
+                    disabled={formData.steps.length <= 1 || (formData.steps.filter(step => step.description.trim() !== '').length === 1 && formData.steps[index].description.trim() !== '')}
                   >
                     Remove
                   </button>
@@ -842,10 +865,10 @@ export default function CreateUpdateRecipe() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || formData.steps.filter(step => step.description.trim() !== '').length === 0}
                 className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-800 transition-colors shadow-button focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Save Recipe'}
+                {isSubmitting ? 'Saving Recipe...' : 'Save Recipe'}
               </button>
             </div>
           </form>
