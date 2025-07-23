@@ -21,16 +21,20 @@ export default function CreateUpdateRecipe() {
   const { id } = useParams();
 
   // Get recipe store actions and state
-  const { createUpdateRecipie, fetchRecipeById, error: recipeError, currentRecipe } = useRecipeStore();
+  const { createUpdateRecipie, fetchRecipeById, error: recipeError, currentRecipe, clearCurrentRecipe } = useRecipeStore();
 
   useEffect(() => {
     if (id && id !== 'new') {
       fetchRecipeById(id as string);
+    } else {
+      // Clear current recipe when creating a new recipe
+      clearCurrentRecipe();
     }
   }, [id]);
 
   useEffect(() => { 
-    if (currentRecipe && !isEditing) {
+    // Only populate form data from currentRecipe when editing an existing recipe
+    if (currentRecipe && !isEditing && id && id !== 'new') {
       console.log('Setting form data from currentRecipe:', currentRecipe);
       // Set all fields from currentRecipe including steps
       setFormData(prev => ({
@@ -47,7 +51,7 @@ export default function CreateUpdateRecipe() {
         })) || [{ _id: 'init-0', id: 'init-0', description: '', step: 1, imageUrl: '', media: [] }]
       }));
     }
-  }, [currentRecipe, isEditing]);
+  }, [currentRecipe, isEditing, id]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -169,11 +173,17 @@ export default function CreateUpdateRecipe() {
     }
   };
 
-  const addStep = () => {
+  const addStep = async (e: React.FormEvent) => {
     setIsEditing(true);
+    const steps = [...formData.steps, { _id: `${Date.now()}`, id: `${Date.now()}`, description: '', step: formData.steps.length + 1, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }]
     setFormData({
       ...formData,
-      steps: [...formData.steps, { _id: `${Date.now()}`, id: `${Date.now()}`, description: '', step: formData.steps.length + 1, imageUrl: '', media: [] as { id: string, url: string, type: string, name?: string }[] }]
+      steps: steps
+    });
+   await createUpdateRecipie(id !== 'new' && id ? id as string : undefined, {
+      ...formData,
+      steps: steps,
+      userId: user?.uid || ''
     });
   };
 
@@ -302,7 +312,7 @@ export default function CreateUpdateRecipe() {
       const data = await res.json();
       setRecipeMedia(Array.isArray(data) ? data : []);
     }
-    if (id) fetchRecipeMedia();
+    if (id && id !== 'new') fetchRecipeMedia();
   }, [id]);
 
   const handleRecipeMediaUpload = async (file: File) => {

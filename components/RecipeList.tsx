@@ -110,7 +110,7 @@ export default function RecipeList() {
                     </div>
                   )}
                   <Image
-                    src={recipe.media[0].url}
+                    src={(recipe.media[0] as any) || ''}
                     alt={recipe.name}
                     fill
                     style={{ objectFit: 'cover' }}
